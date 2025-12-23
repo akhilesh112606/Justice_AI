@@ -12,6 +12,7 @@ import pytesseract
 from dotenv import load_dotenv
 from flask import Blueprint, render_template, request, redirect, url_for, flash, jsonify, Response
 from openai import OpenAI
+from google import genai
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.units import mm
 from reportlab.lib.utils import simpleSplit
@@ -25,6 +26,55 @@ load_dotenv()
 def _get_api_key():
     """Return OpenAI API key from common env names."""
     return os.getenv("OPENAI_API_KEY") or os.getenv("OPEN_API_KEY")
+
+
+def _get_gemini_api_key():
+    """Return Gemini API key from env."""
+    return os.getenv("GEMINI_API_KEY")
+
+
+def _invoke_gemini_text(
+    system_prompt: str,
+    user_prompt: str,
+    *,
+    temperature: float = 0.7,
+    max_output_tokens: int = 500,
+):
+    """Prefer Gemini responses but transparently fall back to OpenAI when needed."""
+
+    api_key = _get_gemini_api_key()
+    if api_key:
+        try:
+            client = genai.Client(api_key=api_key)
+            response = client.models.generate_content(
+                model="gemini-2.0-flash",
+                contents=f"{system_prompt}\n\n{user_prompt}",
+            )
+            if response and hasattr(response, "text") and response.text:
+                return response.text
+        except Exception as exc:  # noqa: BLE001
+            _debug("gemini.primary_error", str(exc))
+
+    # Silent fallback when Gemini is unavailable (e.g., quota restrictions during hackathons).
+    openai_key = _get_api_key()
+    if not openai_key:
+        return None
+
+    try:
+        client = OpenAI(api_key=openai_key)
+        completion = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt},
+            ],
+            temperature=temperature,
+            max_tokens=max_output_tokens,
+        )
+        return completion.choices[0].message.content if completion.choices else None
+    except Exception as exc:  # noqa: BLE001
+        _debug("gemini.fallback_error", str(exc))
+        return None
 
 
 def _debug(label: str, payload):
@@ -304,12 +354,6 @@ def chat():
     if not user_message:
         return jsonify({"reply": "Please enter a message."}), 400
 
-    api_key = _get_api_key()
-    if not api_key:
-        return jsonify({"reply": "AI service is not configured. Please contact the administrator."}), 500
-
-    client = OpenAI(api_key=api_key)
-
     system_prompt = """You are an AI Investigation Advisor assistant for law enforcement. You have analyzed an FIR (First Information Report) document and can answer questions about the case.
 
 Your role:
@@ -330,16 +374,16 @@ FIR Document Content:
 """
 
     try:
-        response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": system_prompt + fir_context},
-                {"role": "user", "content": user_message}
-            ],
-            max_tokens=500,
+        prompt = f"{system_prompt}{fir_context}\n\nUser message:\n{user_message}"
+        reply = _invoke_gemini_text(
+            system_prompt,
+            prompt,
             temperature=0.7,
+            max_output_tokens=500,
         )
-        reply = response.choices[0].message.content.strip()
+        if not reply:
+            return jsonify({"reply": "AI service is not configured. Please contact the administrator."}), 500
+        reply = reply.strip()
         _debug("chat.reply_length", len(reply))
         return jsonify({"reply": reply})
     except Exception as exc:

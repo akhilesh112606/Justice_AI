@@ -513,6 +513,8 @@
     <div class="email-toast-text" id="email-toast-text">Sending report…</div>
   </div>
 
+  <script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.5/dist/purify.min.js" crossorigin="anonymous"></script>
   <script>
     document.body.classList.add('io-ready');
     const observer = new IntersectionObserver((entries) => {
@@ -838,8 +840,21 @@
     const chatSendBtn = document.getElementById('chat-send-btn');
     const firTextArea = document.querySelector('textarea[name="edited_text"]');
 
+    const renderMarkdown = (value) => {
+      const input = value || '';
+      if (window.marked && window.DOMPurify) {
+        const html = window.marked.parse(input, { breaks: true });
+        return window.DOMPurify.sanitize(html);
+      }
+      return input
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;');
+    };
+
     const addMessage = (text, isUser = false) => {
       if (!chatMessages) return;
+      const messageText = text || '';
       const msg = document.createElement('div');
       msg.className = `chat-message ${isUser ? 'user' : 'bot'}`;
 
@@ -849,7 +864,11 @@
 
       const body = document.createElement('div');
       body.className = 'text';
-      body.textContent = text;
+      if (isUser) {
+        body.textContent = messageText;
+      } else {
+        body.innerHTML = renderMarkdown(messageText);
+      }
 
       msg.appendChild(sender);
       msg.appendChild(body);
