@@ -8,3 +8,5 @@ openai
 google-genai
 reportlab
 requests
+opencv-python-headless
+
