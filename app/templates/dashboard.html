@@ -402,7 +402,7 @@
               <span>Judicial section composer</span>
             </div>
             <div class="section-title">Indian statute matches</div>
-            <div class="section-sub">OPENAI analyses your FIR narrative and surfaces likely IPC / CrPC hooks with rationale.</div>
+            <div class="section-sub">AI analysis surfaces likely IPC / CrPC hooks with rationale.</div>
           </div>
 
           <div class="legal-shell">
@@ -410,10 +410,7 @@
             {% set legal_cards = legal_sections if legal_sections is defined else [] %}
             <div class="legal-meta">
               <span class="legal-chip">{{ legal_status.status | default('fallback') | replace('_', ' ') | title }}</span>
-              <span class="legal-note">
-                {% if legal_status.model %}Model: {{ legal_status.model }} · {% endif %}
-                {{ legal_status.notes or 'AI suggestions shown for quick reference.' }}
-              </span>
+              <span class="legal-note">{{ legal_status.notes or 'AI suggestions shown for quick reference.' }}</span>
               <span class="legal-note">
                 {{ legal_status.generated_at or 'Timestamp unavailable' }}
               </span>
@@ -429,7 +426,7 @@
                         <div class="legal-code">{{ sec.code }}</div>
                         <div class="legal-statute">{{ sec.statute }}</div>
                       </div>
-                      <span class="legal-model-badge">{{ 'OPENAI' if sec.origin == 'openai' else 'Curated' }}</span>
+                      <span class="legal-model-badge">{{ 'AI Drafted' if sec.origin == 'openai' else 'Curated' }}</span>
                     </header>
                     <p class="legal-summary">{{ sec.summary }}</p>
                     <div>
@@ -465,7 +462,7 @@
               </div>
             {% else %}
               <div class="legal-empty">
-                OPENAI response unavailable right now. Default IPC / CrPC checklist shown until the service resumes.
+                Live AI response unavailable right now. Default IPC / CrPC checklist shown until the service resumes.
               </div>
             {% endif %}
 
