@@ -162,6 +162,64 @@ def _synthesize_speech(text: str, *, voice: str = "alloy", audio_format: str = "
         return None, None
 
 
+def _transcribe_audio(file_path: str):
+    """Transcribe an audio file using OpenAI Whisper; return (text, error)."""
+
+    api_key = _get_api_key()
+    if not api_key:
+        return None, "Missing OPENAI_API_KEY"
+
+    client = OpenAI(api_key=api_key)
+    try:
+        with open(file_path, "rb") as fh:
+            resp = client.audio.transcriptions.create(model="whisper-1", file=fh)
+        text = (resp.text or "").strip()
+        return text, None if text else "Empty transcription"
+    except Exception as exc:  # noqa: BLE001
+        _debug("audio.transcribe_error", str(exc))
+        return None, str(exc)
+
+
+def _analyze_audio_insights(transcript: str, character: str, fir_context: str):
+    """Use LLM to summarize interrogation audio; return dict with insights."""
+
+    api_key = _get_api_key()
+    if not api_key or not transcript:
+        return None
+
+    client = OpenAI(api_key=api_key)
+    system_msg = (
+        "You are an investigative analyst. Given a transcript and the FIR context, produce STRICT JSON with keys: "
+        "summary (3-5 bullet sentences), risks (2-4 contradiction/risk notes grounded in FIR), actions (3-5 next steps), "
+        "verdict (one of truthful/uncertain/lying), verdict_reason (1-2 sentences citing key contradiction or support), "
+        "contradictions (array of short objects: {claim, fir_statement, assessment}), signal (0-1 float; 1 = truthful, 0 = lying). "
+        "Verdict rule: if the statement clearly conflicts with the FIR (e.g., FIR says Ravi is Akhil's classmate but Ravi denies knowing Akhil), mark verdict=lying and push signal near 0-0.2. "
+        "Use 'uncertain' only when evidence is thin or mixed. The risks list must reflect contradictions with FIR when present."
+    )
+    user_msg = (
+        "Character: " + (character or "Unknown") + "\n"
+        "FIR context:\n" + (fir_context or "[none]") + "\n"
+        "Transcript:\n" + transcript
+    )
+
+    try:
+        completion = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": system_msg},
+                {"role": "user", "content": user_msg},
+            ],
+            temperature=0.35,
+            max_tokens=450,
+            response_format={"type": "json_object"},
+        )
+        raw = completion.choices[0].message.content if completion.choices else ""
+        return json.loads(raw) if raw else None
+    except Exception as exc:  # noqa: BLE001
+        _debug("audio.analysis_error", str(exc))
+        return None
+
+
 def _debug(label: str, payload):
     """Lightweight debug printer to aid troubleshooting without leaking secrets."""
     try:
@@ -486,6 +544,44 @@ FIR Document Content:
     except Exception as exc:
         _debug("chat.error", str(exc))
         return jsonify({"reply": "I apologize, but I encountered an error processing your request. Please try again."}), 500
+
+
+@main.route("/analyze-audio", methods=["POST"])
+def analyze_audio():
+    """Transcribe an interrogation audio and extract insights for a selected character."""
+
+    audio_file = request.files.get("audio")
+    character = (request.form.get("character") or "General").strip() or "General"
+    fir_context = (request.form.get("context") or "").strip()
+
+    if not audio_file or audio_file.filename.strip() == "":
+        return jsonify({"error": "Please attach an audio file."}), 400
+
+    ext = os.path.splitext(audio_file.filename)[1].lower()
+    if ext not in {".wav", ".mp3", ".m4a", ".aac", ".ogg", ".flac", ".webm"}:
+        return jsonify({"error": "Unsupported audio type. Use wav/mp3/m4a/aac/ogg/flac/webm."}), 400
+
+    with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as tmp:
+        audio_file.save(tmp.name)
+        temp_path = tmp.name
+
+    transcript = None
+    try:
+        transcript, err = _transcribe_audio(temp_path)
+        if err or not transcript:
+            return jsonify({"error": f"Transcription failed: {err or 'no text'}"}), 500
+
+        insights = _analyze_audio_insights(transcript, character, fir_context) or {}
+        payload = {
+            "transcript": transcript,
+            "insights": insights,
+        }
+        return jsonify(payload)
+    finally:
+        try:
+            os.remove(temp_path)
+        except OSError:
+            pass
 
 
 @main.route("/report/pdf", methods=["POST"])
