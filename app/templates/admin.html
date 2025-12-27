@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>JUSTICE AI — Admin</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #090c12;
+      --panel: rgba(255,255,255,0.04);
+      --border: rgba(255,255,255,0.1);
+      --accent: #8af3ff;
+      --accent-2: #5ed2ff;
+      --text: #e8f6ff;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 0; background: radial-gradient(circle at 20% 20%, #0f1625, #060910 60%); color: var(--text); font-family: 'Space Grotesk', system-ui, -apple-system, sans-serif; }
+    .shell { max-width: 1200px; margin: 0 auto; padding: 32px 20px 48px; }
+    h1 { margin: 0 0 10px; letter-spacing: -0.4px; }
+    .sub { color: #b9c9d9; margin-bottom: 24px; }
+    .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 18px; padding: 20px; box-shadow: 0 20px 50px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.04) inset; }
+    form { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); align-items: end; }
+    label { font-size: 13px; color: #c9d9e6; display: block; margin-bottom: 6px; letter-spacing: 0.2px; }
+    input, textarea { width: 100%; padding: 12px 14px; border-radius: 12px; border: 1px solid var(--border); background: rgba(0,0,0,0.35); color: var(--text); font-size: 14px; outline: none; transition: border-color 0.2s, box-shadow 0.2s; }
+    input:focus, textarea:focus { border-color: rgba(138,243,255,0.55); box-shadow: 0 0 0 3px rgba(138,243,255,0.16); }
+    textarea { resize: vertical; min-height: 90px; }
+    .actions { display: flex; gap: 10px; flex-wrap: wrap; }
+    .btn { padding: 12px 16px; border-radius: 12px; border: 1px solid rgba(255,255,255,0.18); background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #0b1720; font-weight: 800; cursor: pointer; transition: transform 0.2s, box-shadow 0.2s; box-shadow: 0 14px 30px rgba(94,210,255,0.3); }
+    .btn:hover { transform: translateY(-2px); box-shadow: 0 16px 36px rgba(94,210,255,0.42); }
+    .table { margin-top: 22px; border-collapse: collapse; width: 100%; font-size: 14px; }
+    .table th, .table td { padding: 12px 10px; border-bottom: 1px solid rgba(255,255,255,0.06); text-align: left; }
+    .table th { color: #c9d9e6; font-weight: 700; letter-spacing: 0.2px; }
+    .muted { color: #9fb0c4; font-size: 12px; }
+    .badge { display: inline-flex; padding: 6px 10px; border-radius: 999px; border: 1px solid var(--border); background: rgba(255,255,255,0.05); font-size: 12px; }
+    .toast { margin: 12px 0; padding: 10px 14px; border-radius: 12px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.12); }
+  </style>
+</head>
+<body>
+  <div class="shell">
+    <h1>Admin — Criminal Image Vault</h1>
+    <div class="sub">Add or review stored suspect/criminal images. Records are stored in SQLite at {{ db_path }}.</div>
+
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="toast" role="status">{{ message }}</div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+
+    <div class="panel" style="margin-bottom: 18px;">
+      <form action="/admin" method="post" enctype="multipart/form-data">
+        <div>
+          <label for="name">Name *</label>
+          <input id="name" name="name" type="text" placeholder="Full name" required>
+        </div>
+        <div>
+          <label for="alias">Alias / Nickname</label>
+          <input id="alias" name="alias" type="text" placeholder="Optional alias">
+        </div>
+        <div>
+          <label for="image">Image (jpeg/png/webp)</label>
+          <input id="image" name="image" type="file" accept="image/*" required>
+        </div>
+        <div style="grid-column: 1 / -1;">
+          <label for="notes">Notes</label>
+          <textarea id="notes" name="notes" placeholder="Role, distinguishing features, case IDs, etc."></textarea>
+        </div>
+        <div class="actions" style="grid-column: 1 / -1;">
+          <button type="submit" class="btn">Save Record</button>
+        </div>
+      </form>
+    </div>
+
+    <div class="panel">
+      <div style="display:flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+        <div style="font-weight:700;">Recent Records</div>
+        <div class="muted">Showing latest {{ records|length }} entries</div>
+      </div>
+      <table class="table" aria-label="Recent criminal records">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Name</th>
+            <th>Alias</th>
+            <th>Notes</th>
+            <th>Created</th>
+            <th>Image Size</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% if records and records|length > 0 %}
+            {% for rec in records %}
+              <tr>
+                <td>{{ rec.id }}</td>
+                <td>{{ rec.name }}</td>
+                <td>{{ rec.alias or '—' }}</td>
+                <td>{{ rec.notes or '—' }}</td>
+                <td>{{ rec.created_at or '—' }}</td>
+                <td>{{ rec.size_bytes or 0 }} bytes</td>
+              </tr>
+            {% endfor %}
+          {% else %}
+            <tr><td colspan="6" class="muted">No records yet. Add the first one above.</td></tr>
+          {% endif %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</body>
+</html>

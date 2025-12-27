@@ -7,5 +7,7 @@ openai
 google-genai
 reportlab
 requests
-opencv-python-headless
+opencv-contrib-python
 Pillow
+deepface
+tf-keras

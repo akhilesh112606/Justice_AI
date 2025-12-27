@@ -3,6 +3,7 @@ import io
 import json
 import os
 import smtplib
+import sqlite3
 import tempfile
 from datetime import datetime
 from email.message import EmailMessage
@@ -21,8 +22,18 @@ from reportlab.lib.utils import simpleSplit
 from reportlab.pdfgen import canvas
 from werkzeug.utils import secure_filename
 
+# DeepFace for accurate face recognition
+try:
+    from deepface import DeepFace
+    DEEPFACE_AVAILABLE = True
+except ImportError:
+    DEEPFACE_AVAILABLE = False
+
+from .models import DB_PATH, init_db
+
 main = Blueprint("main", __name__)
 load_dotenv()
+init_db()
 
 
 def _get_api_key():
@@ -322,6 +333,539 @@ def _debug(label: str, payload):
         print(f"[DEBUG] {label}: <unprintable>")
 
 
+def _insert_criminal(name: str, alias: str, notes: str, image_bytes: bytes, mime_type: str = "image/jpeg"):
+    """Persist a criminal record with image BLOB into SQLite."""
+
+    if not name or not image_bytes:
+        raise ValueError("Name and image are required")
+
+    with sqlite3.connect(DB_PATH) as conn:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            INSERT INTO criminals (name, alias, image, mime_type, notes)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (name.strip(), alias.strip() if alias else None, image_bytes, mime_type or "image/jpeg", notes.strip() if notes else None),
+        )
+        conn.commit()
+
+
+def _fetch_criminals(limit: int = 20):
+    """Return recent criminal rows without loading BLOBs."""
+
+    with sqlite3.connect(DB_PATH) as conn:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT id, name, alias, notes, created_at, mime_type, LENGTH(image) as size_bytes
+            FROM criminals
+            ORDER BY datetime(created_at) DESC
+            LIMIT ?
+            """,
+            (limit,),
+        )
+        rows = cur.fetchall()
+    records = []
+    for row in rows:
+        rec = {
+            "id": row[0],
+            "name": row[1],
+            "alias": row[2],
+            "notes": row[3],
+            "created_at": row[4],
+            "mime_type": row[5],
+            "size_bytes": row[6],
+        }
+        records.append(rec)
+    return records
+
+
+def _decode_image(image_bytes: bytes):
+    if not image_bytes:
+        return None
+    arr = np.frombuffer(image_bytes, dtype=np.uint8)
+    img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+    return img
+
+
+def _save_temp_image(image_bytes: bytes, suffix=".jpg"):
+    """Save image bytes to a temporary file and return the path."""
+    if not image_bytes:
+        return None
+    try:
+        fd, path = tempfile.mkstemp(suffix=suffix)
+        os.close(fd)
+        with open(path, "wb") as f:
+            f.write(image_bytes)
+        return path
+    except Exception:
+        return None
+
+
+def _verify_faces_deepface(img1_bytes: bytes, img2_bytes: bytes):
+    """Use DeepFace to verify if two images contain the same person.
+    
+    Returns:
+        dict with 'verified' (bool), 'distance' (float), 'similarity' (float 0-1)
+        or None if verification fails
+    """
+    if not DEEPFACE_AVAILABLE:
+        return None
+    
+    path1 = _save_temp_image(img1_bytes)
+    path2 = _save_temp_image(img2_bytes)
+    
+    if not path1 or not path2:
+        return None
+    
+    try:
+        # Use VGG-Face model - good balance of accuracy and speed
+        # enforce_detection=False allows processing even if face not clearly detected
+        result = DeepFace.verify(
+            img1_path=path1,
+            img2_path=path2,
+            model_name="VGG-Face",
+            detector_backend="opencv",
+            enforce_detection=False,
+            align=True,
+        )
+        
+        # DeepFace returns distance (lower = more similar)
+        # Convert to similarity score (0-1, higher = more similar)
+        distance = result.get("distance", 1.0)
+        threshold = result.get("threshold", 0.4)
+        verified = result.get("verified", False)
+        
+        # Normalize distance to similarity (0-1)
+        # VGG-Face typically uses cosine distance with threshold ~0.4
+        # Distance 0 = identical, Distance > threshold = different person
+        if distance <= 0:
+            similarity = 1.0
+        elif distance >= 1.0:
+            similarity = 0.0
+        else:
+            # Map distance to similarity: 0 distance = 1.0 sim, threshold distance = 0.5 sim
+            similarity = max(0.0, 1.0 - (distance / (threshold * 2)))
+        
+        return {
+            "verified": verified,
+            "distance": distance,
+            "threshold": threshold,
+            "similarity": round(similarity, 3),
+        }
+    except Exception as exc:
+        _debug("deepface.verify_error", str(exc))
+        return None
+    finally:
+        # Clean up temp files
+        try:
+            if path1 and os.path.exists(path1):
+                os.remove(path1)
+            if path2 and os.path.exists(path2):
+                os.remove(path2)
+        except Exception:
+            pass
+
+
+def _get_face_embedding_deepface(image_bytes: bytes):
+    """Extract face embedding using DeepFace.
+    
+    Returns numpy array embedding or None if extraction fails.
+    """
+    if not DEEPFACE_AVAILABLE:
+        return None
+    
+    path = _save_temp_image(image_bytes)
+    if not path:
+        return None
+    
+    try:
+        # Get embedding using VGG-Face
+        embeddings = DeepFace.represent(
+            img_path=path,
+            model_name="VGG-Face",
+            detector_backend="opencv",
+            enforce_detection=False,
+            align=True,
+        )
+        
+        if embeddings and len(embeddings) > 0:
+            # Return the embedding vector (typically 2622-d for VGG-Face)
+            return np.array(embeddings[0]["embedding"], dtype=np.float32)
+        return None
+    except Exception as exc:
+        _debug("deepface.embedding_error", str(exc))
+        return None
+    finally:
+        try:
+            if path and os.path.exists(path):
+                os.remove(path)
+        except Exception:
+            pass
+
+
+def _cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:
+    """Compute cosine similarity between two vectors."""
+    if a is None or b is None:
+        return 0.0
+    norm_a = np.linalg.norm(a)
+    norm_b = np.linalg.norm(b)
+    if norm_a == 0 or norm_b == 0:
+        return 0.0
+    return float(np.dot(a, b) / (norm_a * norm_b))
+
+
+def _detect_face(gray_img):
+    """Detect and return the largest face region, or None if no face found."""
+    cascade_path = os.path.join(cv2.data.haarcascades, "haarcascade_frontalface_default.xml")
+    if not os.path.exists(cascade_path):
+        return None
+    face_cascade = cv2.CascadeClassifier(cascade_path)
+    if face_cascade.empty():
+        return None
+    faces = face_cascade.detectMultiScale(
+        gray_img, scaleFactor=1.1, minNeighbors=5, minSize=(30, 30)
+    )
+    if len(faces) == 0:
+        return None
+    # Return largest face
+    x, y, w, h = sorted(faces, key=lambda f: f[2] * f[3], reverse=True)[0]
+    return gray_img[y : y + h, x : x + w]
+
+
+def _compute_lbp_histogram(gray_face, grid_x=8, grid_y=8):
+    """Compute Local Binary Pattern histogram for face recognition.
+    
+    LBP is more discriminative for faces than ORB averaging.
+    Returns a normalized histogram feature vector.
+    """
+    if gray_face is None:
+        return None
+    
+    # Resize to consistent size
+    face = cv2.resize(gray_face, (128, 128), interpolation=cv2.INTER_AREA)
+    
+    # Compute LBP manually (8 neighbors, radius 1)
+    rows, cols = face.shape
+    lbp = np.zeros((rows - 2, cols - 2), dtype=np.uint8)
+    
+    for i in range(1, rows - 1):
+        for j in range(1, cols - 1):
+            center = face[i, j]
+            code = 0
+            code |= (face[i-1, j-1] >= center) << 7
+            code |= (face[i-1, j  ] >= center) << 6
+            code |= (face[i-1, j+1] >= center) << 5
+            code |= (face[i  , j+1] >= center) << 4
+            code |= (face[i+1, j+1] >= center) << 3
+            code |= (face[i+1, j  ] >= center) << 2
+            code |= (face[i+1, j-1] >= center) << 1
+            code |= (face[i  , j-1] >= center) << 0
+            lbp[i-1, j-1] = code
+    
+    # Compute spatial histogram (divide into grid cells)
+    hist = []
+    cell_h = lbp.shape[0] // grid_y
+    cell_w = lbp.shape[1] // grid_x
+    
+    for gy in range(grid_y):
+        for gx in range(grid_x):
+            cell = lbp[gy * cell_h : (gy + 1) * cell_h, gx * cell_w : (gx + 1) * cell_w]
+            h, _ = np.histogram(cell.ravel(), bins=256, range=(0, 256))
+            hist.extend(h)
+    
+    hist = np.array(hist, dtype=np.float32)
+    norm = np.linalg.norm(hist)
+    if norm > 0:
+        hist = hist / norm
+    return hist
+
+
+def _compute_face_features(image_bytes: bytes):
+    """Extract multiple face features for robust matching.
+    
+    Returns dict with:
+    - lbp_hist: LBP histogram (most discriminative for faces)
+    - intensity_hist: grayscale intensity histogram
+    - face_detected: whether a face was found
+    """
+    if not image_bytes:
+        return None
+    
+    img = _decode_image(image_bytes)
+    if img is None:
+        return None
+    
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    
+    # Try to detect face
+    face_region = _detect_face(gray)
+    face_detected = face_region is not None
+    
+    if not face_detected:
+        # Use center crop as fallback
+        h, w = gray.shape
+        min_dim = min(h, w)
+        start_y = (h - min_dim) // 2
+        start_x = (w - min_dim) // 2
+        face_region = gray[start_y : start_y + min_dim, start_x : start_x + min_dim]
+    
+    # Normalize size
+    face_region = cv2.resize(face_region, (128, 128), interpolation=cv2.INTER_AREA)
+    
+    # Apply histogram equalization for lighting normalization
+    face_region = cv2.equalizeHist(face_region)
+    
+    # Compute LBP histogram
+    lbp_hist = _compute_lbp_histogram(face_region)
+    
+    # Compute intensity histogram
+    intensity_hist, _ = np.histogram(face_region.ravel(), bins=64, range=(0, 256))
+    intensity_hist = intensity_hist.astype(np.float32)
+    norm = np.linalg.norm(intensity_hist)
+    if norm > 0:
+        intensity_hist = intensity_hist / norm
+    
+    return {
+        "lbp_hist": lbp_hist,
+        "intensity_hist": intensity_hist,
+        "face_detected": face_detected,
+    }
+
+
+def _compare_faces(features1, features2):
+    """Compare two face feature sets and return similarity score 0-1.
+    
+    Uses weighted combination of LBP histogram similarity and intensity histogram.
+    Returns lower scores when faces don't match well.
+    """
+    if features1 is None or features2 is None:
+        return 0.0
+    
+    lbp1, lbp2 = features1.get("lbp_hist"), features2.get("lbp_hist")
+    int1, int2 = features1.get("intensity_hist"), features2.get("intensity_hist")
+    face1, face2 = features1.get("face_detected", False), features2.get("face_detected", False)
+    
+    scores = []
+    
+    # LBP histogram comparison (most important for face identity)
+    if lbp1 is not None and lbp2 is not None:
+        # Use histogram intersection for LBP
+        lbp_sim = np.minimum(lbp1, lbp2).sum()
+        scores.append(("lbp", lbp_sim, 0.7))  # 70% weight
+    
+    # Intensity histogram comparison
+    if int1 is not None and int2 is not None:
+        int_sim = np.minimum(int1, int2).sum()
+        scores.append(("intensity", int_sim, 0.3))  # 30% weight
+    
+    if not scores:
+        return 0.0
+    
+    # Weighted average
+    total_weight = sum(s[2] for s in scores)
+    weighted_sum = sum(s[1] * s[2] for s in scores)
+    similarity = weighted_sum / total_weight if total_weight > 0 else 0.0
+    
+    # Apply penalty if face detection status differs
+    if face1 != face2:
+        similarity *= 0.7  # 30% penalty
+    
+    # Clamp to [0, 1]
+    return max(0.0, min(1.0, similarity))
+
+
+def _face_embedding_cv(image_bytes: bytes):
+    """Return a compact face embedding using OpenCV ORB (no external deps).
+    
+    DEPRECATED: Use _compute_face_features() instead for better accuracy.
+    Kept for backward compatibility.
+    """
+
+    if not image_bytes:
+        return None
+
+    img = _decode_image(image_bytes)
+    if img is None:
+        return None
+
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+    # Try to focus on the largest detected face; otherwise use the full frame.
+    face_region = gray
+    cascade_path = os.path.join(cv2.data.haarcascades, "haarcascade_frontalface_default.xml")
+    if os.path.exists(cascade_path):
+        face_cascade = cv2.CascadeClassifier(cascade_path)
+        if not face_cascade.empty():
+            faces = face_cascade.detectMultiScale(gray, scaleFactor=1.2, minNeighbors=5, minSize=(60, 60))
+            if len(faces) > 0:
+                x, y, w, h = sorted(faces, key=lambda f: f[2] * f[3], reverse=True)[0]
+                face_region = gray[y : y + h, x : x + w]
+
+    face_region = cv2.resize(face_region, (256, 256), interpolation=cv2.INTER_AREA)
+
+    try:
+        orb = cv2.ORB_create(500)
+        keypoints, descriptors = orb.detectAndCompute(face_region, None)
+        if descriptors is None or len(descriptors) == 0:
+            return None
+        # ORB descriptors are (N, 32); average to a stable 32-d vector.
+        vec = descriptors.astype(np.float32).mean(axis=0)
+        norm = np.linalg.norm(vec)
+        if norm == 0:
+            return None
+        return vec / norm
+    except Exception as exc:  # noqa: BLE001
+        _debug("face.orb_error", str(exc))
+        return None
+
+
+def _image_phash(image_bytes: bytes):
+    """Compute a perceptual hash (DCT-based) for similarity matching."""
+
+    if not image_bytes:
+        return None
+    arr = np.frombuffer(image_bytes, dtype=np.uint8)
+    img = cv2.imdecode(arr, cv2.IMREAD_COLOR)
+    if img is None:
+        return None
+    try:
+        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+        resized = cv2.resize(gray, (32, 32), interpolation=cv2.INTER_AREA)
+        dct = cv2.dct(np.float32(resized))
+        block = dct[:8, :8]
+        mean = block[1:, 1:].mean()
+        bits = (block > mean).astype(np.uint8)
+        return bits.flatten()
+    except Exception as exc:  # noqa: BLE001
+        _debug("phash.error", str(exc))
+        return None
+
+
+def _hamming(a: np.ndarray, b: np.ndarray) -> int:
+    if a is None or b is None or a.shape != b.shape:
+        return 64
+    return int(np.count_nonzero(a != b))
+
+
+def _cosine(a: np.ndarray, b: np.ndarray) -> float:
+    if a is None or b is None:
+        return -1.0
+    denom = (np.linalg.norm(a) * np.linalg.norm(b))
+    if denom == 0:
+        return -1.0
+    return float(np.dot(a, b) / denom)
+
+
+def _find_best_image_match(query_bytes: bytes):
+    """Return best matching criminal record using DeepFace for accurate face recognition.
+    
+    Uses deep learning face embeddings (VGG-Face) for reliable identity matching.
+    Falls back to embedding cosine similarity if direct verification fails.
+    """
+
+    if not DEEPFACE_AVAILABLE:
+        _debug("match.deepface_unavailable", "DeepFace not installed")
+        return None
+
+    with sqlite3.connect(DB_PATH) as conn:
+        cur = conn.cursor()
+        cur.execute(
+            """
+            SELECT id, name, alias, notes, created_at, mime_type, image
+            FROM criminals
+            ORDER BY datetime(created_at) DESC
+            LIMIT 100
+            """
+        )
+        rows = cur.fetchall()
+
+    if not rows:
+        return None
+
+    # Get embedding for query image once
+    query_embedding = _get_face_embedding_deepface(query_bytes)
+    
+    best = None
+    best_score = -1.0
+    best_verified = False
+
+    for row in rows:
+        cid, name, alias, notes, created_at, mime_type, blob = row
+
+        # Method 1: Try direct face verification (most accurate)
+        verify_result = _verify_faces_deepface(query_bytes, blob)
+        
+        if verify_result:
+            score = verify_result["similarity"]
+            verified = verify_result["verified"]
+            method = "DeepFace VGG-Face"
+            
+            if verified:
+                method += " ✓ Verified"
+            
+            # Prioritize verified matches
+            is_better = False
+            if verified and not best_verified:
+                is_better = True
+            elif verified == best_verified and score > best_score:
+                is_better = True
+            elif not best_verified and score > best_score:
+                is_better = True
+            
+            if is_better:
+                best_score = score
+                best_verified = verified
+                best = {
+                    "id": cid,
+                    "name": name,
+                    "alias": alias,
+                    "notes": notes,
+                    "created_at": created_at,
+                    "mime_type": mime_type or "image/jpeg",
+                    "image_b64": base64.b64encode(blob).decode("ascii"),
+                    "score": round(score, 3),
+                    "method": method,
+                    "verified": verified,
+                }
+        else:
+            # Method 2: Fallback to embedding cosine similarity
+            if query_embedding is not None:
+                db_embedding = _get_face_embedding_deepface(blob)
+                if db_embedding is not None:
+                    # Cosine similarity: 1 = identical, 0 = orthogonal, -1 = opposite
+                    cos_sim = _cosine_similarity(query_embedding, db_embedding)
+                    # Map from [-1,1] to [0,1]
+                    score = (cos_sim + 1.0) / 2.0
+                    
+                    if score > best_score and not best_verified:
+                        best_score = score
+                        best = {
+                            "id": cid,
+                            "name": name,
+                            "alias": alias,
+                            "notes": notes,
+                            "created_at": created_at,
+                            "mime_type": mime_type or "image/jpeg",
+                            "image_b64": base64.b64encode(blob).decode("ascii"),
+                            "score": round(score, 3),
+                            "method": "DeepFace embedding similarity",
+                            "verified": False,
+                        }
+
+    # Add confidence warnings
+    if best:
+        if best_score < 0.3:
+            best["low_confidence"] = True
+            best["message"] = "Very low confidence - likely not a match"
+        elif best_score < 0.5 and not best_verified:
+            best["low_confidence"] = True
+            best["message"] = "Low confidence - verify manually"
+    
+    return best
+
+
 def _get_email_credentials():
     """Return email user/password from env (do not hardcode secrets)."""
     user = os.getenv("REPORT_EMAIL_USER") or os.getenv("EMAIL_USER")
@@ -485,7 +1029,8 @@ def index():
 
 @main.route("/upload", methods=["POST"])
 def upload():
-    file = request.files.get("file")
+    # Accept both "image" (used by dashboard fetch) and "file" (generic form name)
+    file = request.files.get("image") or request.files.get("file")
     if not file or file.filename.strip() == "":
         flash("Please choose an image to upload.", "error")
         return redirect(url_for("main.index"))
@@ -589,6 +1134,75 @@ def rescan():
         legal_sections=legal_sections,
         legal_audit=legal_audit,
     )
+
+
+@main.route("/admin", methods=["GET", "POST"])
+def admin_panel():
+    """Simple admin panel to add criminal images into SQLite."""
+
+    if request.method == "POST":
+        name = (request.form.get("name") or "").strip()
+        alias = (request.form.get("alias") or "").strip()
+        notes = (request.form.get("notes") or "").strip()
+        image_file = request.files.get("image")
+
+        if not name:
+            flash("Name is required.", "error")
+            return redirect(url_for("main.admin_panel"))
+
+        if not image_file or image_file.filename.strip() == "":
+            flash("Please choose an image file to upload.", "error")
+            return redirect(url_for("main.admin_panel"))
+
+        mime = image_file.mimetype or "image/jpeg"
+        if not mime.startswith("image/"):
+            flash("Only image uploads are allowed.", "error")
+            return redirect(url_for("main.admin_panel"))
+
+        image_bytes = image_file.read()
+        max_bytes = 6 * 1024 * 1024  # 6 MB guardrail
+        if len(image_bytes) > max_bytes:
+            flash("Image is too large. Please keep it under 6 MB.", "error")
+            return redirect(url_for("main.admin_panel"))
+
+        try:
+            _insert_criminal(name=name, alias=alias, notes=notes, image_bytes=image_bytes, mime_type=mime)
+            flash("Criminal record saved.", "success")
+        except Exception as exc:  # noqa: BLE001
+            _debug("admin.insert_error", str(exc))
+            flash("Failed to save record. Please try again.", "error")
+
+        return redirect(url_for("main.admin_panel"))
+
+    records = _fetch_criminals(limit=30)
+    return render_template("admin.html", records=records, db_path=str(DB_PATH))
+
+
+@main.route("/match-image", methods=["POST"])
+def match_image():
+    """Compare an uploaded image against stored criminal images using ORB embeddings with pHash fallback."""
+
+    # Accept both "image" (used by dashboard fetch) and "file" (generic form name)
+    file = request.files.get("image") or request.files.get("file")
+    if not file or not file.filename:
+        return jsonify({"error": "No image provided"}), 400
+
+    filename = secure_filename(file.filename)
+    ext = os.path.splitext(filename)[1].lower()
+    if ext not in {".png", ".jpg", ".jpeg", ".bmp", ".tiff", ".tif", ".webp"}:
+        return jsonify({"error": "Unsupported image type"}), 400
+
+    image_bytes = file.read()
+    if not image_bytes:
+        return jsonify({"error": "Empty image"}), 400
+    if len(image_bytes) > 6 * 1024 * 1024:
+        return jsonify({"error": "Image too large (6MB max)"}), 400
+
+    best = _find_best_image_match(image_bytes)
+    if not best:
+        return jsonify({"match": None, "message": "No matches available in the database"}), 200
+
+    return jsonify({"match": best}), 200
 
 
 @main.route("/chat", methods=["POST"])
