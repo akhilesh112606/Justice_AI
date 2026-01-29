@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>ReviewerAI - Extracted Text</title>
+  <title>ReviewerAI - Analysis Results</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Sora:wght@400;600;700&display=swap" rel="stylesheet">
@@ -25,19 +25,29 @@
       z-index: 1; 
     }
 
-    .container { max-width: 1000px; margin: 0 auto; padding: 0 24px; }
+    .container { max-width: 1400px; margin: 0 auto; padding: 0 24px; }
 
     @keyframes fadeInUp { 
       from { opacity: 0; transform: translateY(40px); } 
       to { opacity: 1; transform: translateY(0); } 
     }
 
+    @keyframes pulse { 
+      0%, 100% { opacity: 0.6; } 
+      50% { opacity: 1; } 
+    }
+
+    @keyframes shimmer {
+      0% { background-position: -200% 0; }
+      100% { background-position: 200% 0; }
+    }
+
     /* Background */
     .background { position: fixed; top: 0; left: 0; width: 100%; height: 100%; overflow: hidden; z-index: 0; }
     .bg-orb { position: absolute; border-radius: 50%; filter: blur(80px); }
-    .orb-1 { width: 420px; height: 420px; background: radial-gradient(circle, rgba(167, 139, 250, 0.18), rgba(167, 139, 250, 0.04)); top: -40px; left: 8%; animation: blob 8s ease-in-out infinite; }
-    .orb-2 { width: 420px; height: 420px; background: radial-gradient(circle, rgba(139, 92, 246, 0.14), rgba(0, 0, 0, 0)); bottom: 5%; right: 4%; animation: blob-2 10s ease-in-out infinite; }
-    .orb-3 { width: 360px; height: 360px; background: radial-gradient(circle, rgba(196, 181, 253, 0.22), rgba(0, 0, 0, 0)); top: 50%; left: 50%; transform: translate(-50%, -50%); animation: blob-3 12s ease-in-out infinite; }
+    .orb-1 { width: 420px; height: 420px; background: radial-gradient(circle, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.04)); top: -40px; left: 8%; animation: blob 8s ease-in-out infinite; }
+    .orb-2 { width: 420px; height: 420px; background: radial-gradient(circle, rgba(255, 255, 255, 0.14), rgba(0, 0, 0, 0)); bottom: 5%; right: 4%; animation: blob-2 10s ease-in-out infinite; }
+    .orb-3 { width: 360px; height: 360px; background: radial-gradient(circle, rgba(255, 255, 255, 0.22), rgba(0, 0, 0, 0)); top: 50%; left: 50%; transform: translate(-50%, -50%); animation: blob-3 12s ease-in-out infinite; }
     
     @keyframes blob { 0%, 100% { transform: translate(0, 0) scale(1); } 25% { transform: translate(20px, -30px) scale(1.1); } 50% { transform: translate(-20px, 20px) scale(0.95); } 75% { transform: translate(30px, 10px) scale(1.05); } }
     @keyframes blob-2 { 0%, 100% { transform: translate(0, 0) scale(1); } 25% { transform: translate(-30px, 20px) scale(0.95); } 50% { transform: translate(25px, -15px) scale(1.1); } 75% { transform: translate(-15px, -25px) scale(0.98); } }
@@ -54,60 +64,176 @@
 
     /* Corner badge */
     .corner-badge { position: fixed; bottom: 16px; right: 16px; z-index: 9999; display: flex; align-items: center; gap: 8px; padding: 12px 18px; background: linear-gradient(135deg, rgba(12,14,18,0.96), rgba(6,8,12,0.98)); border: 1px solid rgba(255,255,255,0.12); border-radius: 12px; box-shadow: 0 10px 32px rgba(0,0,0,0.6); backdrop-filter: blur(12px); pointer-events: none; }
-    .corner-badge-dot { width: 8px; height: 8px; border-radius: 50%; background: linear-gradient(135deg, #a78bfa, #8b5cf6); box-shadow: 0 0 10px rgba(167,139,250,0.8); animation: badgePulse 2s ease-in-out infinite; }
+    .corner-badge-dot { width: 8px; height: 8px; border-radius: 50%; background: linear-gradient(135deg, #8af3ff, #5ed2ff); box-shadow: 0 0 10px rgba(138,243,255,0.8); animation: badgePulse 2s ease-in-out infinite; }
     .corner-badge-text { font-size: 12px; font-weight: 700; letter-spacing: 1.5px; color: rgba(255,255,255,0.85); text-transform: uppercase; }
     @keyframes badgePulse { 0%, 100% { opacity: 0.6; transform: scale(0.9); } 50% { opacity: 1; transform: scale(1.1); } }
 
     /* Content */
-    .content { position: relative; z-index: 10; padding: 60px 0 80px; }
+    .content { position: relative; z-index: 10; padding: 40px 0 80px; }
 
     /* Header */
-    .header { text-align: center; margin-bottom: 48px; animation: fadeInUp 0.8s ease-out forwards; }
-    .header-title { font-size: clamp(32px, 5vw, 48px); font-weight: 700; margin-bottom: 12px; background: linear-gradient(120deg, #ffffff, #a78bfa); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
-    .header-subtitle { font-size: 16px; color: #c4b5fd; letter-spacing: 2px; text-transform: uppercase; }
+    .header { text-align: center; margin-bottom: 32px; animation: fadeInUp 0.8s ease-out forwards; }
+    .header-title { font-size: clamp(28px, 4vw, 42px); font-weight: 700; margin-bottom: 8px; background: linear-gradient(120deg, #ffffff 0%, #ffffff 50%, #ffffff 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+    .header-subtitle { font-size: 14px; color: #ffffff; letter-spacing: 4px; text-transform: uppercase; }
 
     /* File info card */
-    .file-info { display: flex; flex-wrap: wrap; gap: 16px; justify-content: center; margin-bottom: 32px; animation: fadeInUp 0.8s ease-out 0.1s forwards; opacity: 0; }
-    .info-chip { display: flex; align-items: center; gap: 8px; padding: 12px 20px; background: rgba(167, 139, 250, 0.08); border: 1px solid rgba(167, 139, 250, 0.25); border-radius: 12px; backdrop-filter: blur(10px); }
-    .info-chip svg { width: 18px; height: 18px; color: #a78bfa; }
-    .info-chip-label { font-size: 12px; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.5px; }
-    .info-chip-value { font-size: 14px; font-weight: 600; color: #ffffff; }
+    .file-info { display: flex; flex-wrap: wrap; gap: 12px; justify-content: center; margin-bottom: 24px; animation: fadeInUp 0.8s ease-out 0.1s forwards; opacity: 0; }
+    .info-chip { display: flex; align-items: center; gap: 8px; padding: 10px 16px; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 12px; backdrop-filter: blur(10px); }
+    .info-chip svg { width: 16px; height: 16px; color: #8af3ff; }
+    .info-chip-label { font-size: 11px; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.5px; }
+    .info-chip-value { font-size: 13px; font-weight: 600; color: #ffffff; }
+
+    /* Score chip */
+    .score-chip { background: linear-gradient(135deg, rgba(138, 243, 255, 0.1), rgba(94, 210, 255, 0.05)); border-color: rgba(138, 243, 255, 0.3); }
+    .score-chip .info-chip-value { color: #8af3ff; font-size: 16px; }
+
+    /* Main layout - Two columns */
+    .main-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; animation: fadeInUp 0.8s ease-out 0.2s forwards; opacity: 0; }
+
+    @media (max-width: 1024px) {
+      .main-layout { grid-template-columns: 1fr; }
+    }
 
     /* Text card */
-    .text-card { background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 20px; backdrop-filter: blur(16px); box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.06) inset; animation: fadeInUp 0.8s ease-out 0.2s forwards; opacity: 0; overflow: hidden; }
-    .text-card-header { display: flex; align-items: center; justify-content: space-between; padding: 20px 24px; border-bottom: 1px solid rgba(255, 255, 255, 0.08); background: rgba(255, 255, 255, 0.02); }
-    .text-card-title { display: flex; align-items: center; gap: 12px; font-size: 18px; font-weight: 600; }
-    .text-card-title svg { width: 24px; height: 24px; color: #a78bfa; }
-    .text-card-actions { display: flex; gap: 8px; }
+    .text-card { background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 20px; backdrop-filter: blur(16px); box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.06) inset; overflow: hidden; display: flex; flex-direction: column; }
+    .text-card-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid rgba(255, 255, 255, 0.08); background: rgba(255, 255, 255, 0.02); }
+    .text-card-title { display: flex; align-items: center; gap: 10px; font-size: 16px; font-weight: 600; }
+    .text-card-title svg { width: 20px; height: 20px; color: #8af3ff; }
+    .text-card-actions { display: flex; gap: 6px; }
     
-    .text-content { padding: 24px; max-height: 60vh; overflow-y: auto; }
-    .text-content pre { white-space: pre-wrap; word-wrap: break-word; font-family: 'Space Grotesk', monospace; font-size: 15px; line-height: 1.8; color: #e5e7eb; }
+    .text-content { padding: 20px; max-height: 55vh; overflow-y: auto; flex: 1; }
+    .text-content pre { white-space: pre-wrap; word-wrap: break-word; font-family: 'Space Grotesk', monospace; font-size: 14px; line-height: 1.7; color: #e5e7eb; }
+
+    /* Highlighted text */
+    .text-content pre .highlight { background: rgba(138, 243, 255, 0.2); border-radius: 3px; padding: 2px 4px; transition: all 0.3s ease; }
+    .text-content pre .highlight.active { background: rgba(138, 243, 255, 0.4); box-shadow: 0 0 20px rgba(138, 243, 255, 0.3); }
+
+    /* Suggestions Panel */
+    .suggestions-panel { background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 20px; backdrop-filter: blur(16px); box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.06) inset; overflow: hidden; display: flex; flex-direction: column; }
+
+    .suggestions-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid rgba(255, 255, 255, 0.08); background: rgba(255, 255, 255, 0.02); }
+    .suggestions-title { display: flex; align-items: center; gap: 10px; font-size: 16px; font-weight: 600; }
+    .suggestions-title svg { width: 20px; height: 20px; color: #8af3ff; }
+
+    /* Page tabs */
+    .page-tabs { display: flex; gap: 8px; padding: 12px 16px; border-bottom: 1px solid rgba(255, 255, 255, 0.06); overflow-x: auto; flex-shrink: 0; }
+    .page-tabs::-webkit-scrollbar { height: 4px; }
+    .page-tabs::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.05); }
+    .page-tabs::-webkit-scrollbar-thumb { background: rgba(138, 243, 255, 0.3); border-radius: 2px; }
+
+    .page-tab { padding: 8px 16px; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 10px; font-size: 13px; font-weight: 500; color: #9ca3af; cursor: pointer; transition: all 0.3s ease; white-space: nowrap; }
+    .page-tab:hover { background: rgba(255, 255, 255, 0.08); color: #ffffff; border-color: rgba(255, 255, 255, 0.2); }
+    .page-tab.active { background: linear-gradient(135deg, rgba(138, 243, 255, 0.15), rgba(94, 210, 255, 0.1)); border-color: rgba(138, 243, 255, 0.4); color: #8af3ff; }
+    .page-tab .score-badge { display: inline-block; margin-left: 8px; padding: 2px 6px; background: rgba(0, 0, 0, 0.3); border-radius: 6px; font-size: 11px; }
+
+    /* Suggestions content */
+    .suggestions-content { padding: 16px; max-height: 55vh; overflow-y: auto; flex: 1; }
+
+    /* Overall summary */
+    .overall-summary { margin-bottom: 20px; padding: 16px; background: linear-gradient(135deg, rgba(138, 243, 255, 0.06), rgba(94, 210, 255, 0.03)); border: 1px solid rgba(138, 243, 255, 0.15); border-radius: 14px; }
+    .summary-grade { display: flex; align-items: center; gap: 16px; margin-bottom: 12px; }
+    .grade-circle { width: 56px; height: 56px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 24px; font-weight: 700; background: linear-gradient(135deg, #8af3ff, #5ed2ff); color: #050505; box-shadow: 0 8px 24px rgba(138, 243, 255, 0.3); }
+    .grade-info h4 { font-size: 16px; font-weight: 600; margin-bottom: 4px; }
+    .grade-info p { font-size: 13px; color: #9ca3af; }
+
+    .summary-lists { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 12px; }
+    .summary-list { padding: 10px; background: rgba(0, 0, 0, 0.2); border-radius: 10px; }
+    .summary-list h5 { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #8af3ff; margin-bottom: 8px; }
+    .summary-list ul { list-style: none; font-size: 12px; color: #d1d5db; }
+    .summary-list li { padding: 4px 0; padding-left: 16px; position: relative; }
+    .summary-list li::before { content: '→'; position: absolute; left: 0; color: #8af3ff; }
+
+    /* Page suggestions */
+    .page-suggestions { display: none; }
+    .page-suggestions.active { display: block; }
+
+    .page-summary { font-size: 13px; color: #9ca3af; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid rgba(255, 255, 255, 0.06); }
+
+    /* Suggestion card */
+    .suggestion-card { padding: 14px; margin-bottom: 12px; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 12px; cursor: pointer; transition: all 0.3s ease; position: relative; overflow: hidden; }
+    .suggestion-card::before { content: ''; position: absolute; top: 0; left: 0; width: 3px; height: 100%; background: #8af3ff; opacity: 0; transition: opacity 0.3s ease; }
+    .suggestion-card:hover { background: rgba(255, 255, 255, 0.06); border-color: rgba(138, 243, 255, 0.3); transform: translateX(4px); }
+    .suggestion-card:hover::before { opacity: 1; }
+    .suggestion-card.expanded { background: rgba(138, 243, 255, 0.08); border-color: rgba(138, 243, 255, 0.4); }
+    .suggestion-card.expanded::before { opacity: 1; }
+
+    .suggestion-header { display: flex; align-items: flex-start; gap: 12px; }
+
+    .severity-icon { width: 32px; height: 32px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .severity-icon svg { width: 18px; height: 18px; }
+    .severity-critical { background: rgba(239, 68, 68, 0.2); color: #ef4444; }
+    .severity-major { background: rgba(251, 191, 36, 0.2); color: #fbbf24; }
+    .severity-minor { background: rgba(138, 243, 255, 0.2); color: #8af3ff; }
+    .severity-info { background: rgba(156, 163, 175, 0.2); color: #9ca3af; }
+
+    .suggestion-main { flex: 1; min-width: 0; }
+    .suggestion-type { display: inline-block; padding: 3px 8px; background: rgba(255, 255, 255, 0.08); border-radius: 6px; font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: #9ca3af; margin-bottom: 6px; }
+    .suggestion-title { font-size: 14px; font-weight: 600; color: #ffffff; margin-bottom: 4px; }
+    .suggestion-location { font-size: 12px; color: #6b7280; }
+
+    .suggestion-expand { width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; border-radius: 6px; background: rgba(255, 255, 255, 0.05); transition: all 0.3s ease; flex-shrink: 0; }
+    .suggestion-expand svg { width: 14px; height: 14px; color: #9ca3af; transition: transform 0.3s ease; }
+    .suggestion-card.expanded .suggestion-expand svg { transform: rotate(180deg); }
+
+    .suggestion-details { display: none; margin-top: 14px; padding-top: 14px; border-top: 1px solid rgba(255, 255, 255, 0.06); }
+    .suggestion-card.expanded .suggestion-details { display: block; }
+
+    .detail-row { margin-bottom: 12px; }
+    .detail-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #6b7280; margin-bottom: 4px; }
+    .detail-value { font-size: 13px; color: #d1d5db; line-height: 1.5; }
+    .detail-value.affected-text { padding: 8px 12px; background: rgba(0, 0, 0, 0.3); border-radius: 8px; font-family: monospace; font-size: 12px; word-break: break-all; }
 
     /* Buttons */
-    .btn { cursor: pointer; border: none; padding: 12px 24px; border-radius: 12px; font-weight: 600; font-size: 14px; transition: all 0.3s ease; display: inline-flex; align-items: center; gap: 8px; text-decoration: none; }
-    .btn-primary { background: linear-gradient(135deg, #a78bfa, #8b5cf6); color: #ffffff; box-shadow: 0 8px 24px rgba(139, 92, 246, 0.3); }
-    .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 12px 32px rgba(139, 92, 246, 0.4); }
-    .btn-secondary { background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.15); color: #ffffff; }
-    .btn-secondary:hover { background: rgba(255, 255, 255, 0.1); border-color: rgba(255, 255, 255, 0.25); }
+    .btn { cursor: pointer; border: none; padding: 12px 24px; border-radius: 14px; font-weight: 700; font-size: 14px; transition: all 0.4s ease; display: inline-flex; align-items: center; gap: 8px; text-decoration: none; }
+    .btn-primary { 
+      background: linear-gradient(135deg, #ffffff, #b5b5b5 50%, #ffffff); 
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      color: #050505; 
+      box-shadow: 0 18px 50px rgba(255, 255, 255, 0.12); 
+    }
+    .btn-primary:hover { transform: translateY(-2px) scale(1.02); box-shadow: 0 22px 60px rgba(255, 255, 255, 0.18); }
+    .btn-secondary { 
+      background: rgba(255, 255, 255, 0.04); 
+      border: 1px solid rgba(255, 255, 255, 0.18); 
+      color: #f5f5f5; 
+      backdrop-filter: blur(12px);
+    }
+    .btn-secondary:hover { transform: translateY(-2px) scale(1.02); border-color: rgba(255, 255, 255, 0.35); box-shadow: 0 16px 40px rgba(255, 255, 255, 0.12); }
     .btn-icon { padding: 10px; border-radius: 10px; }
 
     /* Actions */
     .actions { display: flex; gap: 16px; justify-content: center; margin-top: 32px; animation: fadeInUp 0.8s ease-out 0.3s forwards; opacity: 0; }
 
     /* Scrollbar */
-    .text-content::-webkit-scrollbar { width: 8px; }
-    .text-content::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.05); border-radius: 4px; }
-    .text-content::-webkit-scrollbar-thumb { background: rgba(167, 139, 250, 0.3); border-radius: 4px; }
-    .text-content::-webkit-scrollbar-thumb:hover { background: rgba(167, 139, 250, 0.5); }
+    .text-content::-webkit-scrollbar, .suggestions-content::-webkit-scrollbar { width: 6px; }
+    .text-content::-webkit-scrollbar-track, .suggestions-content::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.05); border-radius: 3px; }
+    .text-content::-webkit-scrollbar-thumb, .suggestions-content::-webkit-scrollbar-thumb { background: rgba(138, 243, 255, 0.3); border-radius: 3px; }
+    .text-content::-webkit-scrollbar-thumb:hover, .suggestions-content::-webkit-scrollbar-thumb:hover { background: rgba(138, 243, 255, 0.5); }
 
     /* SVG Icons */
     svg { fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
 
+    /* Loading state */
+    .loading-shimmer { background: linear-gradient(90deg, rgba(255,255,255,0.03) 25%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.03) 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; }
+
+    /* Empty state */
+    .empty-state { text-align: center; padding: 40px 20px; color: #6b7280; }
+    .empty-state svg { width: 48px; height: 48px; margin-bottom: 16px; opacity: 0.5; }
+    .empty-state h4 { font-size: 16px; color: #9ca3af; margin-bottom: 8px; }
+    .empty-state p { font-size: 13px; }
+
+    /* Tooltip */
+    .tooltip { position: fixed; z-index: 9999; padding: 10px 14px; background: rgba(20, 20, 25, 0.98); border: 1px solid rgba(138, 243, 255, 0.3); border-radius: 10px; font-size: 13px; color: #ffffff; max-width: 300px; box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6); pointer-events: none; opacity: 0; transform: translateY(8px); transition: all 0.2s ease; }
+    .tooltip.visible { opacity: 1; transform: translateY(0); }
+    .tooltip-title { font-weight: 600; margin-bottom: 6px; color: #8af3ff; }
+    .tooltip-fix { font-size: 12px; color: #9ca3af; margin-top: 8px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.1); }
+
     /* Responsive */
     @media (max-width: 640px) {
-      .text-card-header { flex-direction: column; gap: 16px; align-items: flex-start; }
+      .text-card-header, .suggestions-header { flex-direction: column; gap: 12px; align-items: flex-start; }
       .actions { flex-direction: column; }
       .actions .btn { width: 100%; justify-content: center; }
+      .summary-lists { grid-template-columns: 1fr; }
     }
   </style>
 </head>
@@ -125,11 +251,18 @@
     <span class="corner-badge-text">ReviewerAI</span>
   </div>
 
+  <!-- Tooltip container -->
+  <div id="tooltip" class="tooltip">
+    <div class="tooltip-title"></div>
+    <div class="tooltip-desc"></div>
+    <div class="tooltip-fix"></div>
+  </div>
+
   <div class="content">
     <div class="container">
       <div class="header">
-        <h1 class="header-title">Extracted Text</h1>
-        <p class="header-subtitle">Research Paper Content</p>
+        <h1 class="header-title">Analysis Results</h1>
+        <p class="header-subtitle">Research Paper Review</p>
       </div>
 
       <div class="file-info">
@@ -154,22 +287,202 @@
             <div class="info-chip-value">{{ char_count | default(0) }}</div>
           </div>
         </div>
-      </div>
-
-      <div class="text-card">
-        <div class="text-card-header">
-          <div class="text-card-title">
-            <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
-            Document Content
-          </div>
-          <div class="text-card-actions">
-            <button class="btn btn-secondary btn-icon" onclick="copyText()" title="Copy to clipboard">
-              <svg viewBox="0 0 24 24" style="width: 18px; height: 18px;"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
-            </button>
+        {% if formatting_data and formatting_data.score %}
+        <div class="info-chip score-chip">
+          <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5z"></path><path d="M2 17l10 5 10-5"></path><path d="M2 12l10 5 10-5"></path></svg>
+          <div>
+            <div class="info-chip-label">Format Score</div>
+            <div class="info-chip-value">{{ formatting_data.score }}/100</div>
           </div>
         </div>
-        <div class="text-content">
-          <pre id="extracted-text">{{ extracted_text }}</pre>
+        {% endif %}
+      </div>
+
+      <div class="main-layout">
+        <!-- Extracted Text Column -->
+        <div class="text-card">
+          <div class="text-card-header">
+            <div class="text-card-title">
+              <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+              Extracted Text
+            </div>
+            <div class="text-card-actions">
+              <button class="btn btn-secondary btn-icon" onclick="copyText()" title="Copy to clipboard">
+                <svg viewBox="0 0 24 24" style="width: 16px; height: 16px;"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+              </button>
+              <button class="btn btn-secondary btn-icon" onclick="downloadText()" title="Download text">
+                <svg viewBox="0 0 24 24" style="width: 16px; height: 16px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+              </button>
+            </div>
+          </div>
+          <div class="text-content">
+            <pre id="extracted-text">{{ extracted_text }}</pre>
+          </div>
+        </div>
+
+        <!-- Formatting Suggestions Column -->
+        <div class="suggestions-panel">
+          <div class="suggestions-header">
+            <div class="suggestions-title">
+              <svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
+              Formatting Suggestions
+            </div>
+          </div>
+
+          {% if formatting_data and formatting_data.pages %}
+          <!-- Page tabs -->
+          <div class="page-tabs">
+            <button class="page-tab active" data-page="overall">
+              Overview
+            </button>
+            {% for page in formatting_data.pages %}
+            <button class="page-tab" data-page="{{ page.page_number }}">
+              Page {{ page.page_number }}
+              <span class="score-badge">{{ page.page_score }}</span>
+            </button>
+            {% endfor %}
+          </div>
+
+          <div class="suggestions-content">
+            <!-- Overall Summary -->
+            <div class="page-suggestions active" data-page="overall">
+              {% if formatting_data.overall %}
+              <div class="overall-summary">
+                <div class="summary-grade">
+                  <div class="grade-circle">{{ formatting_data.overall.grade | default('B') }}</div>
+                  <div class="grade-info">
+                    <h4>Document Quality Score: {{ formatting_data.score }}/100</h4>
+                    <p>{{ formatting_data.total_pages }} page(s) analyzed</p>
+                  </div>
+                </div>
+                <div class="summary-lists">
+                  {% if formatting_data.overall.strengths %}
+                  <div class="summary-list">
+                    <h5>Strengths</h5>
+                    <ul>
+                      {% for strength in formatting_data.overall.strengths[:3] %}
+                      <li>{{ strength }}</li>
+                      {% endfor %}
+                    </ul>
+                  </div>
+                  {% endif %}
+                  {% if formatting_data.overall.improvements_needed %}
+                  <div class="summary-list">
+                    <h5>Needs Improvement</h5>
+                    <ul>
+                      {% for improvement in formatting_data.overall.improvements_needed[:3] %}
+                      <li>{{ improvement }}</li>
+                      {% endfor %}
+                    </ul>
+                  </div>
+                  {% endif %}
+                </div>
+              </div>
+              {% endif %}
+
+              {% if formatting_data.overall and formatting_data.overall.suggestions %}
+              {% for suggestion in formatting_data.overall.suggestions %}
+              <div class="suggestion-card" 
+                   data-title="{{ suggestion.title }}"
+                   data-description="{{ suggestion.description | default('') }}"
+                   data-fix="">
+                <div class="suggestion-header">
+                  <div class="severity-icon severity-{{ suggestion.priority | default('medium') | replace('high', 'major') | replace('medium', 'minor') | replace('low', 'info') }}">
+                    <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5z"></path><path d="M2 17l10 5 10-5"></path></svg>
+                  </div>
+                  <div class="suggestion-main">
+                    <span class="suggestion-type">{{ suggestion.type | default('structure') }}</span>
+                    <div class="suggestion-title">{{ suggestion.title }}</div>
+                  </div>
+                  <div class="suggestion-expand">
+                    <svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                  </div>
+                </div>
+                <div class="suggestion-details">
+                  <div class="detail-row">
+                    <div class="detail-label">Description</div>
+                    <div class="detail-value">{{ suggestion.description | default('No additional details available.') }}</div>
+                  </div>
+                </div>
+              </div>
+              {% endfor %}
+              {% endif %}
+            </div>
+
+            <!-- Per-page suggestions -->
+            {% for page in formatting_data.pages %}
+            <div class="page-suggestions" data-page="{{ page.page_number }}">
+              <div class="page-summary">{{ page.summary | default('Page ' ~ page.page_number ~ ' analysis') }}</div>
+              
+              {% if page.suggestions %}
+              {% for suggestion in page.suggestions %}
+              <div class="suggestion-card" 
+                   data-title="{{ suggestion.title }}"
+                   data-description="{{ suggestion.description | default('') }}"
+                   data-fix="{{ suggestion.fix | default('') }}"
+                   data-affected="{{ suggestion.affected_text | default('') }}"
+                   data-char-start="{{ page.char_start }}"
+                   data-char-end="{{ page.char_end }}">
+                <div class="suggestion-header">
+                  <div class="severity-icon severity-{{ suggestion.severity | default('info') }}">
+                    {% if suggestion.severity == 'critical' %}
+                    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                    {% elif suggestion.severity == 'major' %}
+                    <svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                    {% elif suggestion.severity == 'minor' %}
+                    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4"></path><path d="M12 8h.01"></path></svg>
+                    {% else %}
+                    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                    {% endif %}
+                  </div>
+                  <div class="suggestion-main">
+                    <span class="suggestion-type">{{ suggestion.type | default('general') }}</span>
+                    <div class="suggestion-title">{{ suggestion.title }}</div>
+                    <div class="suggestion-location">{{ suggestion.location | default('') }}</div>
+                  </div>
+                  <div class="suggestion-expand">
+                    <svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                  </div>
+                </div>
+                <div class="suggestion-details">
+                  <div class="detail-row">
+                    <div class="detail-label">Description</div>
+                    <div class="detail-value">{{ suggestion.description }}</div>
+                  </div>
+                  {% if suggestion.fix %}
+                  <div class="detail-row">
+                    <div class="detail-label">Suggested Fix</div>
+                    <div class="detail-value">{{ suggestion.fix }}</div>
+                  </div>
+                  {% endif %}
+                  {% if suggestion.affected_text %}
+                  <div class="detail-row">
+                    <div class="detail-label">Affected Text</div>
+                    <div class="detail-value affected-text">{{ suggestion.affected_text }}</div>
+                  </div>
+                  {% endif %}
+                </div>
+              </div>
+              {% endfor %}
+              {% else %}
+              <div class="empty-state">
+                <svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                <h4>Looking Good!</h4>
+                <p>No significant formatting issues detected on this page.</p>
+              </div>
+              {% endif %}
+            </div>
+            {% endfor %}
+          </div>
+          {% else %}
+          <div class="suggestions-content">
+            <div class="empty-state">
+              <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+              <h4>Analysis Unavailable</h4>
+              <p>Could not generate formatting suggestions for this document.</p>
+            </div>
+          </div>
+          {% endif %}
         </div>
       </div>
 
@@ -187,10 +500,11 @@
   </div>
 
   <script>
+    // Text functions
     function copyText() {
       const text = document.getElementById('extracted-text').innerText;
       navigator.clipboard.writeText(text).then(() => {
-        alert('Text copied to clipboard!');
+        showNotification('Text copied to clipboard!');
       }).catch(err => {
         console.error('Failed to copy:', err);
       });
@@ -209,6 +523,192 @@
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     }
+
+    function showNotification(message) {
+      const notification = document.createElement('div');
+      notification.style.cssText = `
+        position: fixed;
+        bottom: 80px;
+        left: 50%;
+        transform: translateX(-50%);
+        padding: 12px 24px;
+        background: linear-gradient(135deg, rgba(138, 243, 255, 0.9), rgba(94, 210, 255, 0.9));
+        color: #050505;
+        border-radius: 12px;
+        font-weight: 600;
+        font-size: 14px;
+        z-index: 10000;
+        box-shadow: 0 10px 40px rgba(138, 243, 255, 0.4);
+        animation: fadeInUp 0.3s ease-out;
+      `;
+      notification.textContent = message;
+      document.body.appendChild(notification);
+      setTimeout(() => {
+        notification.style.opacity = '0';
+        notification.style.transform = 'translateX(-50%) translateY(10px)';
+        notification.style.transition = 'all 0.3s ease-out';
+        setTimeout(() => notification.remove(), 300);
+      }, 2000);
+    }
+
+    // Page tab switching
+    const pageTabs = document.querySelectorAll('.page-tab');
+    const pageSuggestions = document.querySelectorAll('.page-suggestions');
+
+    pageTabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        const pageNum = tab.dataset.page;
+        
+        // Update active tab
+        pageTabs.forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        
+        // Show corresponding suggestions
+        pageSuggestions.forEach(ps => {
+          if (ps.dataset.page === pageNum) {
+            ps.classList.add('active');
+          } else {
+            ps.classList.remove('active');
+          }
+        });
+      });
+    });
+
+    // Suggestion card expand/collapse
+    const suggestionCards = document.querySelectorAll('.suggestion-card');
+    
+    suggestionCards.forEach(card => {
+      card.addEventListener('click', (e) => {
+        // Toggle expanded state
+        const wasExpanded = card.classList.contains('expanded');
+        
+        // Collapse all other cards
+        suggestionCards.forEach(c => c.classList.remove('expanded'));
+        
+        // Toggle this card
+        if (!wasExpanded) {
+          card.classList.add('expanded');
+        }
+      });
+    });
+
+    // Tooltip functionality
+    const tooltip = document.getElementById('tooltip');
+    const tooltipTitle = tooltip.querySelector('.tooltip-title');
+    const tooltipDesc = tooltip.querySelector('.tooltip-desc');
+    const tooltipFix = tooltip.querySelector('.tooltip-fix');
+    let tooltipTimeout;
+
+    suggestionCards.forEach(card => {
+      card.addEventListener('mouseenter', (e) => {
+        clearTimeout(tooltipTimeout);
+        
+        const title = card.dataset.title || '';
+        const description = card.dataset.description || '';
+        const fix = card.dataset.fix || '';
+        
+        if (title || description) {
+          tooltipTitle.textContent = title;
+          tooltipDesc.textContent = description.substring(0, 150) + (description.length > 150 ? '...' : '');
+          tooltipFix.textContent = fix ? '💡 ' + fix.substring(0, 100) + (fix.length > 100 ? '...' : '') : '';
+          tooltipFix.style.display = fix ? 'block' : 'none';
+          
+          tooltipTimeout = setTimeout(() => {
+            positionTooltip(e);
+            tooltip.classList.add('visible');
+          }, 400);
+        }
+      });
+
+      card.addEventListener('mousemove', (e) => {
+        if (tooltip.classList.contains('visible')) {
+          positionTooltip(e);
+        }
+      });
+
+      card.addEventListener('mouseleave', () => {
+        clearTimeout(tooltipTimeout);
+        tooltip.classList.remove('visible');
+      });
+    });
+
+    function positionTooltip(e) {
+      const x = e.clientX + 15;
+      const y = e.clientY + 15;
+      
+      // Keep tooltip in viewport
+      const tooltipRect = tooltip.getBoundingClientRect();
+      const maxX = window.innerWidth - tooltipRect.width - 20;
+      const maxY = window.innerHeight - tooltipRect.height - 20;
+      
+      tooltip.style.left = Math.min(x, maxX) + 'px';
+      tooltip.style.top = Math.min(y, maxY) + 'px';
+    }
+
+    // Highlight affected text on hover
+    const textContent = document.getElementById('extracted-text');
+    const originalText = textContent.textContent;
+
+    suggestionCards.forEach(card => {
+      const affectedText = card.dataset.affected;
+      
+      if (affectedText && affectedText.length > 3) {
+        card.addEventListener('mouseenter', () => {
+          highlightText(affectedText);
+        });
+        
+        card.addEventListener('mouseleave', () => {
+          removeHighlights();
+        });
+      }
+    });
+
+    function highlightText(searchText) {
+      if (!searchText || searchText.length < 3) return;
+      
+      // Clean the search text
+      const cleanSearch = searchText.replace(/\.\.\.$/, '').trim();
+      if (cleanSearch.length < 3) return;
+      
+      const text = textContent.textContent;
+      const lowerText = text.toLowerCase();
+      const lowerSearch = cleanSearch.toLowerCase();
+      
+      const index = lowerText.indexOf(lowerSearch);
+      if (index !== -1) {
+        const before = text.substring(0, index);
+        const match = text.substring(index, index + cleanSearch.length);
+        const after = text.substring(index + cleanSearch.length);
+        
+        textContent.innerHTML = escapeHtml(before) + 
+          '<span class="highlight active">' + escapeHtml(match) + '</span>' + 
+          escapeHtml(after);
+        
+        // Scroll to highlighted text
+        const highlight = textContent.querySelector('.highlight');
+        if (highlight) {
+          highlight.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }
+    }
+
+    function removeHighlights() {
+      textContent.textContent = originalText;
+    }
+
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    // Keyboard navigation
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        suggestionCards.forEach(c => c.classList.remove('expanded'));
+        tooltip.classList.remove('visible');
+      }
+    });
   </script>
 </body>
 </html>

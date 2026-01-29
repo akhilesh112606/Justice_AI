@@ -1083,12 +1083,17 @@ def upload():
 
     _debug("upload.extracted_text_len", len(extracted_text))
 
+    # Analyze formatting suggestions
+    formatting_data = analyze_formatting_suggestions(extracted_text, filename)
+    _debug("upload.formatting_score", formatting_data.get("score", 0))
+
     return render_template(
         "results.html",
         filename=filename,
         extracted_text=extracted_text,
         word_count=len(extracted_text.split()),
         char_count=len(extracted_text),
+        formatting_data=formatting_data,
     )
 
 
@@ -1782,6 +1787,343 @@ def build_roadmap(extracted_text: str, characters: list, general_questions: list
         return normalized or default_steps
     except Exception:
         return default_steps
+
+
+def analyze_formatting_suggestions(text: str, filename: str = "") -> dict:
+    """Analyze document text and generate formatting/alignment suggestions using AI.
+    
+    Returns a dict with:
+    - pages: list of page-level suggestions
+    - overall: overall document suggestions
+    - score: formatting quality score 0-100
+    """
+    
+    if not text or len(text.strip()) < 50:
+        return {
+            "pages": [],
+            "overall": {"suggestions": ["Document is too short for analysis."]},
+            "score": 0,
+            "error": None
+        }
+    
+    # Split text into approximate pages (roughly 3000 chars per page)
+    page_size = 3000
+    pages_text = []
+    for i in range(0, len(text), page_size):
+        page_content = text[i:i + page_size]
+        if page_content.strip():
+            pages_text.append(page_content)
+    
+    if not pages_text:
+        pages_text = [text]
+    
+    # Try AI-based analysis first
+    api_key = _get_api_key()
+    
+    if api_key:
+        try:
+            client = OpenAI(api_key=api_key)
+            
+            # Analyze each page
+            pages_suggestions = []
+            
+            for page_num, page_text in enumerate(pages_text[:10], 1):  # Limit to first 10 pages
+                system_msg = """You are an expert document formatting and academic writing reviewer. 
+Analyze the given text excerpt from a research paper and provide specific, actionable formatting and alignment suggestions.
+
+Focus on:
+1. Paragraph structure and spacing
+2. Heading hierarchy and formatting
+3. Text alignment issues
+4. Citation formatting
+5. List and bullet formatting
+6. Figure/table reference formatting
+7. Section organization
+8. Academic writing style
+9. Consistency issues
+10. Typography concerns (if detectable)
+
+Respond ONLY in JSON with this exact structure:
+{
+    "suggestions": [
+        {
+            "type": "heading|paragraph|alignment|citation|list|figure|section|style|consistency|typography",
+            "severity": "critical|major|minor|info",
+            "title": "Short title (max 8 words)",
+            "description": "Detailed description of the issue",
+            "location": "Approximate location description (e.g., 'paragraph 2', 'beginning of page')",
+            "fix": "Suggested fix or improvement",
+            "affected_text": "Short snippet of affected text if applicable (max 50 chars)"
+        }
+    ],
+    "page_score": 0-100,
+    "summary": "One sentence summary of page formatting quality"
+}
+
+Provide 3-7 suggestions per page, prioritizing the most impactful issues."""
+
+                user_msg = f"Page {page_num} of document '{filename}':\n\n{page_text[:2500]}"
+                
+                response = client.chat.completions.create(
+                    model="gpt-4o-mini",
+                    messages=[
+                        {"role": "system", "content": system_msg},
+                        {"role": "user", "content": user_msg}
+                    ],
+                    temperature=0.3,
+                    max_tokens=1200,
+                )
+                
+                raw = response.choices[0].message.content.strip()
+                
+                # Parse JSON
+                if "```json" in raw:
+                    raw = raw.split("```json")[1].split("```")[0].strip()
+                elif "```" in raw:
+                    raw = raw.split("```")[1].split("```")[0].strip()
+                
+                import json
+                page_data = json.loads(raw)
+                page_data["page_number"] = page_num
+                page_data["char_start"] = (page_num - 1) * page_size
+                page_data["char_end"] = min(page_num * page_size, len(text))
+                pages_suggestions.append(page_data)
+            
+            # Generate overall document suggestions
+            overall_system = """You are an expert document formatting reviewer. Based on the document text, provide overall formatting and structure suggestions for the entire document.
+
+Respond ONLY in JSON:
+{
+    "suggestions": [
+        {
+            "type": "structure|consistency|style|formatting",
+            "title": "Short title",
+            "description": "Detailed description",
+            "priority": "high|medium|low"
+        }
+    ],
+    "overall_score": 0-100,
+    "grade": "A|B|C|D|F",
+    "strengths": ["strength 1", "strength 2"],
+    "improvements_needed": ["improvement 1", "improvement 2"]
+}"""
+            
+            overall_response = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {"role": "system", "content": overall_system},
+                    {"role": "user", "content": f"Full document text (truncated):\n\n{text[:6000]}"}
+                ],
+                temperature=0.3,
+                max_tokens=800,
+            )
+            
+            overall_raw = overall_response.choices[0].message.content.strip()
+            if "```json" in overall_raw:
+                overall_raw = overall_raw.split("```json")[1].split("```")[0].strip()
+            elif "```" in overall_raw:
+                overall_raw = overall_raw.split("```")[1].split("```")[0].strip()
+            
+            overall_data = json.loads(overall_raw)
+            
+            # Calculate average score
+            page_scores = [p.get("page_score", 70) for p in pages_suggestions]
+            avg_score = sum(page_scores) / len(page_scores) if page_scores else 70
+            
+            return {
+                "pages": pages_suggestions,
+                "overall": overall_data,
+                "score": int((avg_score + overall_data.get("overall_score", 70)) / 2),
+                "total_pages": len(pages_text),
+                "error": None
+            }
+            
+        except Exception as exc:
+            _debug("formatting_analysis.ai_error", str(exc))
+    
+    # Fallback: Rule-based analysis
+    return _analyze_formatting_rules(text, pages_text, filename)
+
+
+def _analyze_formatting_rules(text: str, pages_text: list, filename: str) -> dict:
+    """Rule-based formatting analysis fallback when AI is unavailable."""
+    
+    import re
+    
+    pages_suggestions = []
+    
+    for page_num, page_text in enumerate(pages_text[:10], 1):
+        suggestions = []
+        
+        # Check for very long paragraphs (>500 chars without line break)
+        paragraphs = page_text.split('\n\n')
+        for i, para in enumerate(paragraphs):
+            if len(para) > 500:
+                suggestions.append({
+                    "type": "paragraph",
+                    "severity": "minor",
+                    "title": "Long paragraph detected",
+                    "description": f"Paragraph {i+1} is quite long ({len(para)} characters). Consider breaking it into smaller paragraphs for better readability.",
+                    "location": f"Paragraph {i+1}",
+                    "fix": "Split into 2-3 shorter paragraphs with clear topic sentences.",
+                    "affected_text": para[:50] + "..." if len(para) > 50 else para
+                })
+        
+        # Check for inconsistent spacing
+        if '  ' in page_text:
+            double_space_count = page_text.count('  ')
+            suggestions.append({
+                "type": "alignment",
+                "severity": "minor",
+                "title": "Inconsistent spacing",
+                "description": f"Found {double_space_count} instances of double spaces.",
+                "location": "Throughout the page",
+                "fix": "Replace double spaces with single spaces for consistency.",
+                "affected_text": ""
+            })
+        
+        # Check for potential heading issues (lines that look like headings but aren't formatted)
+        lines = page_text.split('\n')
+        for i, line in enumerate(lines):
+            stripped = line.strip()
+            if stripped and len(stripped) < 60 and stripped.isupper() and len(stripped) > 5:
+                if not stripped.endswith(':'):
+                    suggestions.append({
+                        "type": "heading",
+                        "severity": "info",
+                        "title": "Potential heading detected",
+                        "description": "This line appears to be a heading. Ensure proper heading formatting is applied.",
+                        "location": f"Line {i+1}",
+                        "fix": "Apply consistent heading style (bold, larger font, proper spacing).",
+                        "affected_text": stripped[:50]
+                    })
+        
+        # Check for citation patterns
+        citation_patterns = [
+            r'\([A-Z][a-z]+,?\s*\d{4}\)',  # (Author, 2020)
+            r'\[[0-9]+\]',  # [1]
+            r'\([0-9]+\)',  # (1)
+        ]
+        found_citations = set()
+        for pattern in citation_patterns:
+            if re.search(pattern, page_text):
+                found_citations.add(pattern)
+        
+        if len(found_citations) > 1:
+            suggestions.append({
+                "type": "citation",
+                "severity": "major",
+                "title": "Mixed citation styles",
+                "description": "Multiple citation formats detected. Academic papers should use consistent citation style.",
+                "location": "Throughout the page",
+                "fix": "Choose one citation style (APA, IEEE, etc.) and apply consistently.",
+                "affected_text": ""
+            })
+        
+        # Check for bullet/list formatting
+        bullet_chars = ['•', '-', '*', '○', '►']
+        bullets_found = [c for c in bullet_chars if c in page_text]
+        if len(bullets_found) > 1:
+            suggestions.append({
+                "type": "list",
+                "severity": "minor",
+                "title": "Inconsistent list markers",
+                "description": f"Multiple bullet styles found: {', '.join(bullets_found)}",
+                "location": "List sections",
+                "fix": "Use consistent bullet markers throughout the document.",
+                "affected_text": ""
+            })
+        
+        # Check for figure/table references
+        fig_refs = re.findall(r'[Ff]igure\s*\.?\s*\d+|[Ff]ig\s*\.?\s*\d+', page_text)
+        table_refs = re.findall(r'[Tt]able\s*\.?\s*\d+', page_text)
+        
+        if fig_refs or table_refs:
+            fig_patterns = set([ref.split()[0].lower() for ref in fig_refs])
+            if len(fig_patterns) > 1:
+                suggestions.append({
+                    "type": "figure",
+                    "severity": "minor",
+                    "title": "Inconsistent figure references",
+                    "description": "Mix of 'Figure' and 'Fig.' abbreviations detected.",
+                    "location": "Figure references",
+                    "fix": "Use either 'Figure' or 'Fig.' consistently throughout.",
+                    "affected_text": ""
+                })
+        
+        # Calculate page score
+        severity_scores = {"critical": 20, "major": 10, "minor": 5, "info": 2}
+        deductions = sum(severity_scores.get(s.get("severity", "info"), 0) for s in suggestions)
+        page_score = max(40, 100 - deductions)
+        
+        pages_suggestions.append({
+            "page_number": page_num,
+            "suggestions": suggestions[:7],
+            "page_score": page_score,
+            "summary": f"Page {page_num}: {len(suggestions)} formatting suggestions identified.",
+            "char_start": (page_num - 1) * 3000,
+            "char_end": min(page_num * 3000, len(text))
+        })
+    
+    # Overall suggestions
+    overall_suggestions = []
+    
+    # Document length check
+    word_count = len(text.split())
+    if word_count < 500:
+        overall_suggestions.append({
+            "type": "structure",
+            "title": "Short document",
+            "description": f"Document contains only {word_count} words. Research papers typically have more content.",
+            "priority": "medium"
+        })
+    
+    # Check abstract
+    if "abstract" not in text.lower()[:2000]:
+        overall_suggestions.append({
+            "type": "structure",
+            "title": "Abstract may be missing",
+            "description": "No 'Abstract' heading detected in the beginning of the document.",
+            "priority": "high"
+        })
+    
+    # Check references section
+    if "references" not in text.lower()[-3000:] and "bibliography" not in text.lower()[-3000:]:
+        overall_suggestions.append({
+            "type": "structure",
+            "title": "References section may be missing",
+            "description": "No 'References' or 'Bibliography' section detected at the end.",
+            "priority": "high"
+        })
+    
+    # Calculate overall score
+    page_scores = [p.get("page_score", 70) for p in pages_suggestions]
+    avg_score = sum(page_scores) / len(page_scores) if page_scores else 70
+    
+    if avg_score >= 90:
+        grade = "A"
+    elif avg_score >= 80:
+        grade = "B"
+    elif avg_score >= 70:
+        grade = "C"
+    elif avg_score >= 60:
+        grade = "D"
+    else:
+        grade = "F"
+    
+    return {
+        "pages": pages_suggestions,
+        "overall": {
+            "suggestions": overall_suggestions,
+            "overall_score": int(avg_score),
+            "grade": grade,
+            "strengths": ["Document was successfully parsed", "Text extraction completed"],
+            "improvements_needed": [s["title"] for s in overall_suggestions[:3]]
+        },
+        "score": int(avg_score),
+        "total_pages": len(pages_text),
+        "error": None
+    }
 
 
 def extract_text_from_pdf(pdf_path: str) -> str:

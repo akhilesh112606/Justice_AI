@@ -8,6 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Sora:wght@400;600;700&display=swap" rel="stylesheet">
   <script type="module" src="https://unpkg.com/@splinetool/viewer@1.12.27/build/spline-viewer.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <style>
     * {
       margin: 0;
@@ -968,8 +969,11 @@
           </div>
         </div>
         <div class="processing-frame">
-          <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; padding: 32px;">
-            <svg style="width: 80px; height: 80px; color: #a78bfa; margin-bottom: 24px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+          <div id="pdf-preview-container" style="display: none; width: 100%; height: 100%; position: relative;">
+            <canvas id="pdf-canvas" style="width: 100%; height: 100%; object-fit: contain;"></canvas>
+          </div>
+          <div id="doc-icon-container" style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; padding: 32px;">
+            <svg style="width: 80px; height: 80px; color: #8af3ff; margin-bottom: 24px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
               <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
               <polyline points="14 2 14 8 20 8"></polyline>
               <line x1="16" y1="13" x2="8" y2="13"></line>
@@ -986,6 +990,11 @@
     </div>
 
   <script>
+    // Initialize PDF.js worker
+    if (typeof pdfjsLib !== 'undefined') {
+      pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+    }
+
     const mousePosition = { x: 0, y: 0 };
 
     document.addEventListener('mousemove', (e) => {
@@ -1049,25 +1058,77 @@
     const uploadLabelText = document.getElementById('upload-label-text');
     const processingOverlay = document.getElementById('processing-overlay');
     const fileNameDisplay = document.getElementById('file-name-display');
+    const pdfPreviewContainer = document.getElementById('pdf-preview-container');
+    const docIconContainer = document.getElementById('doc-icon-container');
+    const pdfCanvas = document.getElementById('pdf-canvas');
+
+    async function renderPdfFirstPage(file) {
+      if (!file || !file.name.toLowerCase().endsWith('.pdf')) {
+        return false;
+      }
+
+      try {
+        const arrayBuffer = await file.arrayBuffer();
+        const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+        const page = await pdf.getPage(1);
+        
+        const canvas = pdfCanvas;
+        const ctx = canvas.getContext('2d');
+        
+        // Get the container dimensions
+        const container = pdfPreviewContainer;
+        const containerWidth = container.offsetWidth || 400;
+        const containerHeight = container.offsetHeight || 533;
+        
+        // Calculate scale to fit container
+        const viewport = page.getViewport({ scale: 1 });
+        const scaleX = containerWidth / viewport.width;
+        const scaleY = containerHeight / viewport.height;
+        const scale = Math.min(scaleX, scaleY) * 1.5; // Slightly higher for better quality
+        
+        const scaledViewport = page.getViewport({ scale });
+        
+        canvas.width = scaledViewport.width;
+        canvas.height = scaledViewport.height;
+        
+        await page.render({
+          canvasContext: ctx,
+          viewport: scaledViewport
+        }).promise;
+        
+        return true;
+      } catch (error) {
+        console.error('PDF rendering error:', error);
+        return false;
+      }
+    }
 
     if (fileInput && uploadForm) {
-      fileInput.addEventListener('change', () => {
+      fileInput.addEventListener('change', async () => {
         if (fileInput.files && fileInput.files.length > 0) {
           uploadLabelText.textContent = 'Uploading...';
           const file = fileInput.files[0];
 
-          const showOverlayAndSubmit = () => {
-            if (processingOverlay) {
-              processingOverlay.classList.add('active');
-              document.body.classList.add('scanning');
-            }
-            if (fileNameDisplay && file) {
-              fileNameDisplay.textContent = file.name;
-            }
-            setTimeout(() => uploadForm.submit(), 180);
-          };
+          // Show overlay immediately
+          if (processingOverlay) {
+            processingOverlay.classList.add('active');
+            document.body.classList.add('scanning');
+          }
+          if (fileNameDisplay && file) {
+            fileNameDisplay.textContent = file.name;
+          }
 
-          showOverlayAndSubmit();
+          // Try to render PDF first page
+          if (file.name.toLowerCase().endsWith('.pdf') && typeof pdfjsLib !== 'undefined') {
+            const rendered = await renderPdfFirstPage(file);
+            if (rendered && pdfPreviewContainer && docIconContainer) {
+              pdfPreviewContainer.style.display = 'block';
+              docIconContainer.style.display = 'none';
+            }
+          }
+
+          // Submit form after a short delay
+          setTimeout(() => uploadForm.submit(), 300);
         }
       });
     }
