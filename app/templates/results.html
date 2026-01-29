@@ -648,6 +648,294 @@
       left: 0; 
       color: #8af3ff; 
     }
+
+    /* ==================== CITATION ANALYSIS SECTION ==================== */
+    .citation-section {
+      margin-top: 32px;
+      animation: fadeInUp 0.8s ease-out 0.5s forwards;
+      opacity: 0;
+    }
+
+    .citation-panel {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 20px;
+      backdrop-filter: blur(16px);
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.06) inset;
+      overflow: hidden;
+    }
+
+    .citation-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 20px 24px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(255, 255, 255, 0.02);
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+
+    .citation-title {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 18px;
+      font-weight: 600;
+    }
+
+    .citation-title svg { width: 24px; height: 24px; color: #fbbf24; }
+
+    /* Citation score ring */
+    .citation-score-container { display: flex; align-items: center; gap: 20px; }
+
+    .citation-score-ring {
+      width: 70px;
+      height: 70px;
+      position: relative;
+    }
+
+    .citation-score-ring svg {
+      transform: rotate(-90deg);
+      width: 100%;
+      height: 100%;
+    }
+
+    .citation-ring-bg {
+      fill: none;
+      stroke: rgba(255, 255, 255, 0.1);
+      stroke-width: 6;
+    }
+
+    .citation-ring-progress {
+      fill: none;
+      stroke-width: 6;
+      stroke-linecap: round;
+      transition: stroke-dashoffset 1s ease-out;
+    }
+
+    .citation-ring-progress.excellent { stroke: #10b981; }
+    .citation-ring-progress.good { stroke: #8af3ff; }
+    .citation-ring-progress.needs_improvement { stroke: #fbbf24; }
+    .citation-ring-progress.poor { stroke: #ef4444; }
+
+    .citation-score-text {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 18px;
+      font-weight: 700;
+    }
+
+    .citation-score-text.excellent { color: #10b981; }
+    .citation-score-text.good { color: #8af3ff; }
+    .citation-score-text.needs_improvement { color: #fbbf24; }
+    .citation-score-text.poor { color: #ef4444; }
+
+    .citation-status { text-align: left; }
+    .citation-status-label { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #9ca3af; margin-bottom: 4px; }
+    .citation-status-value { font-size: 14px; font-weight: 600; }
+
+    /* Citation content */
+    .citation-content { padding: 24px; }
+
+    /* Citation stats grid */
+    .citation-stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    @media (max-width: 900px) { .citation-stats-grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 500px) { .citation-stats-grid { grid-template-columns: 1fr; } }
+
+    .citation-stat-card {
+      padding: 16px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
+      text-align: center;
+      transition: all 0.3s ease;
+    }
+
+    .citation-stat-card:hover {
+      background: rgba(255, 255, 255, 0.06);
+      border-color: rgba(251, 191, 36, 0.3);
+    }
+
+    .citation-stat-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 10px;
+    }
+
+    .citation-stat-icon svg { width: 18px; height: 18px; }
+    .citation-stat-icon.gold { background: rgba(251, 191, 36, 0.15); color: #fbbf24; }
+    .citation-stat-icon.green { background: rgba(16, 185, 129, 0.15); color: #10b981; }
+    .citation-stat-icon.red { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
+    .citation-stat-icon.cyan { background: rgba(138, 243, 255, 0.15); color: #8af3ff; }
+
+    .citation-stat-value { font-size: 24px; font-weight: 700; color: #ffffff; margin-bottom: 4px; }
+    .citation-stat-label { font-size: 11px; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.5px; }
+
+    /* Citation tabs */
+    .citation-tabs {
+      display: flex;
+      gap: 8px;
+      padding: 16px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      margin-bottom: 20px;
+      overflow-x: auto;
+    }
+
+    .citation-tab {
+      padding: 10px 18px;
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 500;
+      color: #9ca3af;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      white-space: nowrap;
+    }
+
+    .citation-tab:hover { background: rgba(255, 255, 255, 0.08); color: #ffffff; }
+    .citation-tab.active {
+      background: linear-gradient(135deg, rgba(251, 191, 36, 0.15), rgba(251, 191, 36, 0.05));
+      border-color: rgba(251, 191, 36, 0.4);
+      color: #fbbf24;
+    }
+
+    /* Citation tab panels */
+    .citation-tab-panel { display: none; }
+    .citation-tab-panel.active { display: block; animation: fadeInUp 0.4s ease-out; }
+
+    /* Issue cards for citations */
+    .citation-issue-card {
+      padding: 14px 16px;
+      margin-bottom: 12px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
+      border-left: 3px solid;
+    }
+
+    .citation-issue-card.critical { border-left-color: #ef4444; }
+    .citation-issue-card.major { border-left-color: #fbbf24; }
+    .citation-issue-card.minor { border-left-color: #8af3ff; }
+
+    .citation-issue-header { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+    .citation-issue-type { font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; padding: 3px 8px; border-radius: 6px; }
+    .citation-issue-type.critical { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
+    .citation-issue-type.major { background: rgba(251, 191, 36, 0.15); color: #fbbf24; }
+    .citation-issue-type.minor { background: rgba(138, 243, 255, 0.15); color: #8af3ff; }
+
+    .citation-issue-title { font-size: 15px; font-weight: 600; color: #ffffff; }
+    .citation-issue-description { font-size: 13px; color: #9ca3af; margin-bottom: 8px; line-height: 1.5; }
+    .citation-issue-recommendation { font-size: 12px; color: #8af3ff; padding: 8px 12px; background: rgba(138, 243, 255, 0.05); border-radius: 8px; }
+    .citation-issue-recommendation::before { content: '💡 '; }
+
+    /* Reference list */
+    .reference-list { max-height: 400px; overflow-y: auto; }
+
+    .reference-item {
+      padding: 14px 16px;
+      margin-bottom: 10px;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      border-radius: 10px;
+      transition: all 0.3s ease;
+    }
+
+    .reference-item:hover { background: rgba(255, 255, 255, 0.04); border-color: rgba(255, 255, 255, 0.12); }
+
+    .reference-header { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+    .reference-number {
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      background: rgba(251, 191, 36, 0.15);
+      color: #fbbf24;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .reference-verification {
+      padding: 3px 10px;
+      border-radius: 6px;
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
+    .reference-verification.verified { background: rgba(16, 185, 129, 0.15); color: #10b981; }
+    .reference-verification.unverified { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
+    .reference-verification.partial { background: rgba(251, 191, 36, 0.15); color: #fbbf24; }
+
+    .reference-text { font-size: 13px; color: #d1d5db; line-height: 1.5; word-break: break-word; }
+    .reference-meta { display: flex; gap: 12px; margin-top: 8px; flex-wrap: wrap; }
+    .reference-meta-item { font-size: 11px; color: #6b7280; display: flex; align-items: center; gap: 4px; }
+    .reference-meta-item svg { width: 12px; height: 12px; }
+
+    /* Unsupported claims */
+    .claim-item {
+      padding: 14px 16px;
+      margin-bottom: 12px;
+      background: rgba(251, 191, 36, 0.05);
+      border: 1px solid rgba(251, 191, 36, 0.2);
+      border-radius: 10px;
+    }
+
+    .claim-type { font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: #fbbf24; margin-bottom: 6px; }
+    .claim-context { font-size: 13px; color: #d1d5db; line-height: 1.5; }
+    .claim-context mark { background: rgba(251, 191, 36, 0.3); color: #fbbf24; padding: 2px 4px; border-radius: 3px; }
+    .claim-location { font-size: 11px; color: #6b7280; margin-top: 8px; }
+
+    /* LLM Citation Assessment */
+    .llm-citation-assessment {
+      padding: 20px;
+      background: linear-gradient(135deg, rgba(251, 191, 36, 0.08), rgba(251, 191, 36, 0.02));
+      border: 1px solid rgba(251, 191, 36, 0.2);
+      border-radius: 14px;
+      margin-top: 20px;
+    }
+
+    .llm-citation-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 12px;
+      font-size: 15px;
+      font-weight: 600;
+      color: #fbbf24;
+    }
+
+    .llm-citation-header svg { width: 18px; height: 18px; }
+
+    .credibility-badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 8px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      margin-left: auto;
+    }
+
+    .credibility-badge.high { background: rgba(16, 185, 129, 0.15); color: #10b981; }
+    .credibility-badge.medium { background: rgba(251, 191, 36, 0.15); color: #fbbf24; }
+    .credibility-badge.low { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
   </style>
 </head>
 <body>
@@ -1252,6 +1540,259 @@
       </div>
       {% endif %}
 
+      <!-- Citation Analysis Section -->
+      {% if citation_data %}
+      <div class="citation-section">
+        <div class="citation-panel">
+          <div class="citation-header">
+            <div class="citation-title">
+              <svg viewBox="0 0 24 24"><path d="M6 2h9a2 2 0 0 1 2 2v2"></path><path d="M6 22h12a2 2 0 0 0 2-2V9.5L14.5 4H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2z"></path><polyline points="14 2 14 8 20 8"></polyline><path d="M12 18v-6"></path><path d="M9 15l3 3 3-3"></path></svg>
+              Citation Analysis
+            </div>
+            <div class="citation-score-container">
+              <div class="citation-score-ring">
+                <svg viewBox="0 0 36 36">
+                  <circle class="citation-ring-bg" cx="18" cy="18" r="15"></circle>
+                  <circle class="citation-ring-progress {{ citation_data.risk_level | default('good') }}" 
+                          cx="18" cy="18" r="15"
+                          stroke-dasharray="{{ ((citation_data.citation_score | default(75)) / 100) * 94.2 }} 94.2"></circle>
+                </svg>
+                <span class="citation-score-text {{ citation_data.risk_level | default('good') }}">{{ citation_data.citation_score | default(75) }}</span>
+              </div>
+              <div class="citation-status">
+                <div class="citation-status-label">Citation Quality</div>
+                <div class="citation-status-value" style="color: {% if citation_data.risk_level == 'excellent' %}#10b981{% elif citation_data.risk_level == 'good' %}#8af3ff{% elif citation_data.risk_level == 'needs_improvement' %}#fbbf24{% else %}#ef4444{% endif %};">
+                  {{ citation_data.risk_level | default('good') | replace('_', ' ') | title }}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="citation-content">
+            <!-- Stats Grid -->
+            <div class="citation-stats-grid">
+              <div class="citation-stat-card">
+                <div class="citation-stat-icon gold">
+                  <svg viewBox="0 0 24 24"><path d="M6 2h9a2 2 0 0 1 2 2v2"></path><path d="M6 22h12a2 2 0 0 0 2-2V9.5L14.5 4H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2z"></path></svg>
+                </div>
+                <div class="citation-stat-value">{{ citation_data.total_citations | default(0) }}</div>
+                <div class="citation-stat-label">Citations Found</div>
+              </div>
+              <div class="citation-stat-card">
+                <div class="citation-stat-icon cyan">
+                  <svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+                </div>
+                <div class="citation-stat-value">{{ citation_data.total_references | default(0) }}</div>
+                <div class="citation-stat-label">References</div>
+              </div>
+              <div class="citation-stat-card">
+                <div class="citation-stat-icon green">
+                  <svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                </div>
+                <div class="citation-stat-value">{{ citation_data.verified_count | default(0) }}</div>
+                <div class="citation-stat-label">Verified Refs</div>
+              </div>
+              <div class="citation-stat-card">
+                <div class="citation-stat-icon red">
+                  <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>
+                </div>
+                <div class="citation-stat-value">{{ citation_data.issues | length | default(0) }}</div>
+                <div class="citation-stat-label">Issues Found</div>
+              </div>
+            </div>
+
+            <!-- Citation Tabs -->
+            <div class="citation-tabs" id="citation-tabs">
+              <button class="citation-tab active" data-citpanel="issues">Issues & Recommendations</button>
+              <button class="citation-tab" data-citpanel="references">References ({{ citation_data.total_references | default(0) }})</button>
+              <button class="citation-tab" data-citpanel="claims">Unsupported Claims</button>
+              <button class="citation-tab" data-citpanel="density">Density Analysis</button>
+            </div>
+
+            <!-- Issues Panel -->
+            <div class="citation-tab-panel active" data-citpanel="issues">
+              {% if citation_data.issues %}
+              {% for issue in citation_data.issues %}
+              <div class="citation-issue-card {{ issue.severity | default('minor') }}">
+                <div class="citation-issue-header">
+                  <span class="citation-issue-type {{ issue.severity | default('minor') }}">{{ issue.severity | default('minor') }}</span>
+                  <span class="citation-issue-title">{{ issue.title }}</span>
+                </div>
+                <div class="citation-issue-description">{{ issue.description }}</div>
+                {% if issue.recommendation %}
+                <div class="citation-issue-recommendation">{{ issue.recommendation }}</div>
+                {% endif %}
+              </div>
+              {% endfor %}
+              {% else %}
+              <div class="empty-state">
+                <svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                <h4>No Major Issues</h4>
+                <p>Citation practices appear to be well-maintained.</p>
+              </div>
+              {% endif %}
+
+              <!-- LLM Citation Assessment -->
+              {% if citation_data.llm_analysis %}
+              <div class="llm-citation-assessment">
+                <div class="llm-citation-header">
+                  <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"></path></svg>
+                  AI Citation Assessment
+                  {% if citation_data.llm_analysis.credibility %}
+                  <span class="credibility-badge {{ citation_data.llm_analysis.credibility }}">{{ citation_data.llm_analysis.credibility }} Credibility</span>
+                  {% endif %}
+                </div>
+                <p class="llm-assessment-text">{{ citation_data.llm_analysis.assessment | default('No assessment available.') }}</p>
+                {% if citation_data.llm_analysis.recommendations %}
+                <ul class="llm-recommendations">
+                  {% for rec in citation_data.llm_analysis.recommendations %}
+                  <li>{{ rec }}</li>
+                  {% endfor %}
+                </ul>
+                {% endif %}
+              </div>
+              {% endif %}
+            </div>
+
+            <!-- References Panel -->
+            <div class="citation-tab-panel" data-citpanel="references">
+              {% if citation_data.references %}
+              <div class="reference-list">
+                {% for ref in citation_data.references %}
+                <div class="reference-item">
+                  <div class="reference-header">
+                    <span class="reference-number">{{ ref.number }}</span>
+                    {% if ref.verification %}
+                    <span class="reference-verification {% if ref.verification.verified %}verified{% elif ref.verification.confidence > 0.5 %}partial{% else %}unverified{% endif %}">
+                      {% if ref.verification.verified %}✓ Verified{% elif ref.verification.confidence > 0.5 %}Partial{% else %}⚠ Unverified{% endif %}
+                    </span>
+                    {% endif %}
+                    {% if ref.year %}
+                    <span class="reference-meta-item">
+                      <svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                      {{ ref.year }}
+                    </span>
+                    {% endif %}
+                  </div>
+                  <div class="reference-text">{{ ref.raw_text[:200] }}{% if ref.raw_text | length > 200 %}...{% endif %}</div>
+                  <div class="reference-meta">
+                    {% if ref.doi %}
+                    <span class="reference-meta-item">
+                      <svg viewBox="0 0 24 24"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg>
+                      DOI: {{ ref.doi[:30] }}...
+                    </span>
+                    {% endif %}
+                    {% if ref.title %}
+                    <span class="reference-meta-item" title="{{ ref.title }}">
+                      <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path></svg>
+                      {{ ref.title[:40] }}{% if ref.title | length > 40 %}...{% endif %}
+                    </span>
+                    {% endif %}
+                  </div>
+                </div>
+                {% endfor %}
+              </div>
+              {% else %}
+              <div class="empty-state">
+                <svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+                <h4>No References Found</h4>
+                <p>Could not detect a references section in the document.</p>
+              </div>
+              {% endif %}
+            </div>
+
+            <!-- Unsupported Claims Panel -->
+            <div class="citation-tab-panel" data-citpanel="claims">
+              {% if citation_data.unsupported_claims %}
+              <p style="font-size: 13px; color: #9ca3af; margin-bottom: 16px;">
+                These statements typically require citations but appear to lack proper references:
+              </p>
+              {% for claim in citation_data.unsupported_claims %}
+              <div class="claim-item">
+                <div class="claim-type">{{ claim.type }}</div>
+                <div class="claim-context">
+                  {{ claim.context | replace(claim.text, '<mark>' ~ claim.text ~ '</mark>') | safe }}
+                </div>
+                <div class="claim-location">Page {{ claim.page }}</div>
+              </div>
+              {% endfor %}
+              {% else %}
+              <div class="empty-state">
+                <svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                <h4>All Claims Appear Supported</h4>
+                <p>No obvious unsupported claims detected.</p>
+              </div>
+              {% endif %}
+            </div>
+
+            <!-- Density Analysis Panel -->
+            <div class="citation-tab-panel" data-citpanel="density">
+              {% if citation_data.citation_density %}
+              <div class="citation-stats-grid" style="margin-bottom: 20px;">
+                <div class="citation-stat-card">
+                  <div class="citation-stat-value">{{ citation_data.citation_density.citations_per_1000_words | default(0) }}</div>
+                  <div class="citation-stat-label">Per 1000 Words</div>
+                </div>
+                <div class="citation-stat-card">
+                  <div class="citation-stat-value">{{ citation_data.citation_density.citations_per_sentence | default(0) }}</div>
+                  <div class="citation-stat-label">Per Sentence</div>
+                </div>
+                <div class="citation-stat-card">
+                  <div class="citation-stat-value">{{ citation_data.styles_found | length | default(0) }}</div>
+                  <div class="citation-stat-label">Styles Found</div>
+                </div>
+                <div class="citation-stat-card">
+                  <div class="citation-stat-value">{% if citation_data.styles_found %}{{ citation_data.styles_found[0] | replace('_', ' ') | title }}{% else %}None{% endif %}</div>
+                  <div class="citation-stat-label">Primary Style</div>
+                </div>
+              </div>
+
+              {% if citation_data.reference_quality %}
+              <h5 style="font-size: 14px; color: #fbbf24; margin-bottom: 12px;">Reference Quality Metrics</h5>
+              <div class="citation-stats-grid">
+                <div class="citation-stat-card">
+                  <div class="citation-stat-value">{{ citation_data.reference_quality.avg_year | default('N/A') }}</div>
+                  <div class="citation-stat-label">Average Year</div>
+                </div>
+                <div class="citation-stat-card">
+                  <div class="citation-stat-value">{{ citation_data.reference_quality.recent_refs_count | default(0) }}</div>
+                  <div class="citation-stat-label">Recent (2020+)</div>
+                </div>
+                <div class="citation-stat-card">
+                  <div class="citation-stat-value">{{ citation_data.reference_quality.outdated_refs_count | default(0) }}</div>
+                  <div class="citation-stat-label">Outdated (&lt;2010)</div>
+                </div>
+                <div class="citation-stat-card">
+                  <div class="citation-stat-value">{{ citation_data.reference_quality.newest_year | default('N/A') }}-{{ citation_data.reference_quality.oldest_year | default('N/A') }}</div>
+                  <div class="citation-stat-label">Year Range</div>
+                </div>
+              </div>
+              {% endif %}
+
+              {% if citation_data.page_distribution %}
+              <h5 style="font-size: 14px; color: #fbbf24; margin: 20px 0 12px;">Citation Distribution by Page</h5>
+              <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                {% for page, count in citation_data.page_distribution.items() %}
+                <div style="padding: 10px 14px; background: rgba(251, 191, 36, 0.1); border: 1px solid rgba(251, 191, 36, 0.2); border-radius: 8px; text-align: center;">
+                  <div style="font-size: 16px; font-weight: 700; color: #fbbf24;">{{ count }}</div>
+                  <div style="font-size: 10px; color: #9ca3af;">Page {{ page }}</div>
+                </div>
+                {% endfor %}
+              </div>
+              {% endif %}
+              {% else %}
+              <div class="empty-state">
+                <svg viewBox="0 0 24 24"><path d="M3 3v18h18"></path><path d="M18 17V9"></path><path d="M13 17V5"></path><path d="M8 17v-3"></path></svg>
+                <h4>No Density Data</h4>
+                <p>Unable to calculate citation density metrics.</p>
+              </div>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
       <div class="actions">
         <a href="/" class="btn btn-secondary">
           <svg viewBox="0 0 24 24" style="width: 18px; height: 18px;"><path d="M19 12H5"></path><polyline points="12 19 5 12 12 5"></polyline></svg>
@@ -1712,6 +2253,41 @@
         scoreCircle.style.transition = 'stroke-dashoffset 1.5s ease-out';
         scoreCircle.style.strokeDashoffset = finalOffset;
       }, 500);
+    }
+
+    // Citation Analysis Tab Switching
+    const citationTabs = document.querySelectorAll('#citation-tabs .citation-tab');
+    const citationPanels = document.querySelectorAll('.citation-tab-panel');
+
+    citationTabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        const panelName = tab.dataset.citpanel;
+        
+        // Update active tab
+        citationTabs.forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        
+        // Show corresponding panel
+        citationPanels.forEach(panel => {
+          if (panel.dataset.citpanel === panelName) {
+            panel.classList.add('active');
+          } else {
+            panel.classList.remove('active');
+          }
+        });
+      });
+    });
+
+    // Animate citation score ring on load
+    const citationScoreRing = document.querySelector('.citation-ring-progress');
+    if (citationScoreRing) {
+      const dashArray = citationScoreRing.getAttribute('stroke-dasharray');
+      citationScoreRing.style.strokeDasharray = '0 94.2';
+      
+      setTimeout(() => {
+        citationScoreRing.style.transition = 'stroke-dasharray 1.5s ease-out';
+        citationScoreRing.style.strokeDasharray = dashArray;
+      }, 700);
     }
   </script>
 </body>

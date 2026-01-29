@@ -1104,6 +1104,10 @@ def upload():
         plagiarism_data = enhance_plagiarism_with_llm(extracted_text, plagiarism_data)
     _debug("upload.plagiarism_score", plagiarism_data.get("overall_score", 0))
 
+    # Analyze citations
+    citation_data = analyze_citations(extracted_text, filename)
+    _debug("upload.citation_score", citation_data.get("citation_score", 0))
+
     return render_template(
         "results.html",
         filename=filename,
@@ -1112,6 +1116,7 @@ def upload():
         char_count=len(extracted_text),
         formatting_data=formatting_data,
         plagiarism_data=plagiarism_data,
+        citation_data=citation_data,
         pdf_base64=pdf_base64,
         is_pdf=is_pdf,
     )
@@ -3104,6 +3109,568 @@ Provide your assessment and recommendations."""
         basic_analysis["llm_enhanced"] = False
     
     return basic_analysis
+
+
+def analyze_citations(text: str, filename: str = "") -> dict:
+    """Comprehensive citation analysis for research papers.
+    
+    Analyzes:
+    - Citation detection and extraction (various formats)
+    - Citation density and distribution
+    - Format consistency
+    - Reference verification (simulated web check)
+    - Citation-claim alignment
+    - Missing citation detection
+    - Reference quality metrics
+    
+    Returns dict with detailed citation analysis.
+    """
+    import re
+    from collections import Counter
+    from urllib.parse import quote_plus
+    
+    if not text or len(text.strip()) < 100:
+        return {
+            "total_citations": 0,
+            "citation_score": 0,
+            "error": "Document too short for citation analysis",
+            "citations": [],
+            "references": [],
+            "issues": [],
+            "verified_count": 0,
+            "unverified_count": 0
+        }
+    
+    # ============ CITATION DETECTION ============
+    
+    # Define citation patterns for different styles
+    citation_patterns = {
+        "numeric_bracket": r'\[(\d+(?:\s*[-–,]\s*\d+)*)\]',  # [1], [1-3], [1, 2, 3]
+        "numeric_paren": r'\((\d+(?:\s*[-–,]\s*\d+)*)\)',  # (1), (1-3)
+        "author_year": r'\(([A-Z][a-zA-Z]+(?:\s+(?:et\s+al\.?|and|&)\s+[A-Z][a-zA-Z]+)?,?\s*\d{4}[a-z]?)\)',  # (Smith, 2020), (Smith et al., 2020)
+        "author_year_no_paren": r'([A-Z][a-zA-Z]+(?:\s+(?:et\s+al\.?|and|&)\s+[A-Z][a-zA-Z]+)?)\s*\((\d{4}[a-z]?)\)',  # Smith (2020)
+        "superscript_style": r'(?<=[a-zA-Z.,])(\d{1,3})(?=\s|[.,;:\)]|$)',  # Superscript-like numbers after text
+    }
+    
+    detected_citations = []
+    citation_styles_found = set()
+    
+    # Extract citations by pattern
+    for style_name, pattern in citation_patterns.items():
+        matches = re.finditer(pattern, text)
+        for match in matches:
+            citation_text = match.group(0)
+            citation_content = match.group(1) if match.lastindex else match.group(0)
+            position = match.start()
+            
+            # Get surrounding context (50 chars before and after)
+            context_start = max(0, position - 60)
+            context_end = min(len(text), position + len(citation_text) + 60)
+            context = text[context_start:context_end]
+            
+            # Calculate approximate page and paragraph
+            text_before = text[:position]
+            approx_page = (len(text_before) // 3000) + 1
+            paragraph_count = text_before.count('\n\n') + 1
+            
+            detected_citations.append({
+                "text": citation_text,
+                "content": citation_content,
+                "style": style_name,
+                "position": position,
+                "context": context.strip(),
+                "page": approx_page,
+                "paragraph": paragraph_count
+            })
+            citation_styles_found.add(style_name)
+    
+    # Remove duplicates based on position (keep unique positions)
+    seen_positions = set()
+    unique_citations = []
+    for cit in sorted(detected_citations, key=lambda x: x["position"]):
+        # Allow positions within 5 chars to be considered same
+        is_duplicate = any(abs(cit["position"] - pos) < 5 for pos in seen_positions)
+        if not is_duplicate:
+            unique_citations.append(cit)
+            seen_positions.add(cit["position"])
+    
+    detected_citations = unique_citations
+    
+    # ============ REFERENCE EXTRACTION ============
+    
+    # Find references section
+    references = []
+    ref_section_match = re.search(
+        r'(?:references|bibliography|works\s+cited|literature\s+cited)\s*\n',
+        text,
+        re.IGNORECASE
+    )
+    
+    if ref_section_match:
+        ref_section = text[ref_section_match.end():]
+        
+        # Split into individual references
+        # Try numbered format first
+        numbered_refs = re.split(r'\n\s*\[?\d{1,3}\]?\.?\s+', ref_section)
+        
+        if len(numbered_refs) > 2:
+            for i, ref in enumerate(numbered_refs[1:], 1):  # Skip first empty
+                ref_clean = ref.strip()
+                if len(ref_clean) > 20:  # Valid reference
+                    ref_info = parse_reference(ref_clean, i)
+                    references.append(ref_info)
+        else:
+            # Try paragraph-based splitting
+            paragraphs = ref_section.split('\n\n')
+            for i, para in enumerate(paragraphs, 1):
+                para_clean = para.strip()
+                if len(para_clean) > 30 and not para_clean.lower().startswith(('appendix', 'figure', 'table')):
+                    ref_info = parse_reference(para_clean, i)
+                    references.append(ref_info)
+                if len(references) >= 100:  # Limit
+                    break
+    
+    # ============ REFERENCE VERIFICATION ============
+    
+    verified_refs = []
+    unverified_refs = []
+    
+    for ref in references[:20]:  # Limit verification to first 20
+        verification = verify_reference(ref)
+        ref["verification"] = verification
+        if verification["verified"]:
+            verified_refs.append(ref)
+        else:
+            unverified_refs.append(ref)
+    
+    # ============ CITATION DENSITY ANALYSIS ============
+    
+    word_count = len(text.split())
+    sentences = re.split(r'[.!?]+', text)
+    sentence_count = len([s for s in sentences if s.strip()])
+    
+    citation_density = {
+        "citations_per_1000_words": round((len(detected_citations) / max(word_count, 1)) * 1000, 2),
+        "citations_per_sentence": round(len(detected_citations) / max(sentence_count, 1), 3),
+        "total_citations": len(detected_citations),
+        "total_references": len(references)
+    }
+    
+    # Analyze citation distribution by page
+    page_distribution = Counter(cit["page"] for cit in detected_citations)
+    total_pages = max(page_distribution.keys()) if page_distribution else 1
+    
+    # ============ CITATION ISSUES DETECTION ============
+    
+    issues = []
+    
+    # Check for style inconsistency
+    if len(citation_styles_found) > 1:
+        # Filter out false positives
+        major_styles = [s for s in citation_styles_found if s not in ["superscript_style"]]
+        if len(major_styles) > 1:
+            issues.append({
+                "type": "inconsistency",
+                "severity": "major",
+                "title": "Mixed Citation Styles",
+                "description": f"Multiple citation formats detected: {', '.join(major_styles)}. Academic papers should use consistent citation style.",
+                "recommendation": "Choose one citation style (APA, IEEE, Chicago, etc.) and apply consistently throughout."
+            })
+    
+    # Check citation density
+    if citation_density["citations_per_1000_words"] < 5 and word_count > 1000:
+        issues.append({
+            "type": "density",
+            "severity": "major",
+            "title": "Low Citation Density",
+            "description": f"Only {citation_density['citations_per_1000_words']} citations per 1000 words. Research papers typically have 15-30 citations per 1000 words.",
+            "recommendation": "Add more citations to support claims, especially in introduction and related work sections."
+        })
+    elif citation_density["citations_per_1000_words"] > 50:
+        issues.append({
+            "type": "density",
+            "severity": "minor",
+            "title": "Very High Citation Density",
+            "description": f"Unusually high citation density ({citation_density['citations_per_1000_words']} per 1000 words). This may indicate over-citation.",
+            "recommendation": "Review if all citations are necessary and contribute meaningfully to the argument."
+        })
+    
+    # Check for citation-reference mismatch
+    cited_numbers = set()
+    for cit in detected_citations:
+        if cit["style"] in ["numeric_bracket", "numeric_paren"]:
+            # Extract all numbers from citation
+            nums = re.findall(r'\d+', cit["content"])
+            for n in nums:
+                cited_numbers.add(int(n))
+    
+    if cited_numbers and references:
+        max_cited = max(cited_numbers) if cited_numbers else 0
+        if max_cited > len(references):
+            issues.append({
+                "type": "mismatch",
+                "severity": "critical",
+                "title": "Citation-Reference Mismatch",
+                "description": f"Citations reference up to [{max_cited}], but only {len(references)} references found.",
+                "recommendation": "Ensure all cited numbers correspond to entries in the references section."
+            })
+    
+    # Check for uncited references
+    if references and cited_numbers:
+        ref_numbers = set(range(1, len(references) + 1))
+        uncited = ref_numbers - cited_numbers
+        if uncited and len(uncited) > 2:
+            issues.append({
+                "type": "uncited",
+                "severity": "minor",
+                "title": "Uncited References",
+                "description": f"References {list(uncited)[:5]}{'...' if len(uncited) > 5 else ''} are not cited in the text.",
+                "recommendation": "Remove unused references or ensure all listed references are cited."
+            })
+    
+    # Check for unverified/suspicious references
+    if len(unverified_refs) > len(verified_refs) and len(references) > 5:
+        issues.append({
+            "type": "verification",
+            "severity": "major",
+            "title": "Many Unverifiable References",
+            "description": f"{len(unverified_refs)} out of {len(references[:20])} checked references could not be verified.",
+            "recommendation": "Double-check reference accuracy. Ensure DOIs, publication years, and author names are correct."
+        })
+    
+    # Check for self-citation pattern
+    self_citation_count = 0
+    for ref in references:
+        if ref.get("potential_self_cite"):
+            self_citation_count += 1
+    
+    if self_citation_count > len(references) * 0.3 and len(references) > 5:
+        issues.append({
+            "type": "self_citation",
+            "severity": "minor",
+            "title": "High Self-Citation Ratio",
+            "description": f"Approximately {self_citation_count} references may be self-citations ({round(self_citation_count/len(references)*100)}%).",
+            "recommendation": "While self-citation is acceptable, excessive self-citation may raise concerns. Aim for diverse sources."
+        })
+    
+    # ============ MISSING CITATION DETECTION ============
+    
+    # Statements that typically need citations
+    claim_patterns = [
+        (r'studies\s+(?:have\s+)?show(?:n|ed|s)?', "Research claim"),
+        (r'research\s+(?:has\s+)?(?:demonstrate|indicate|suggest|reveal)', "Research claim"),
+        (r'according\s+to', "Attribution"),
+        (r'it\s+(?:has\s+been|is)\s+(?:proven|shown|demonstrated|established)', "Established fact claim"),
+        (r'previous(?:ly)?\s+(?:work|research|studies)', "Prior work reference"),
+        (r'\d+%\s+of', "Statistical claim"),
+        (r'(?:first|originally)\s+(?:proposed|introduced|developed)\s+(?:by|in)', "Origin claim"),
+        (r'widely\s+(?:accepted|known|used|adopted)', "Consensus claim"),
+    ]
+    
+    unsupported_claims = []
+    for pattern, claim_type in claim_patterns:
+        matches = re.finditer(pattern, text, re.IGNORECASE)
+        for match in matches:
+            pos = match.start()
+            # Check if there's a citation within 100 characters after
+            nearby_text = text[pos:min(pos + 150, len(text))]
+            has_nearby_citation = any(
+                re.search(p, nearby_text) for p in citation_patterns.values()
+            )
+            
+            if not has_nearby_citation:
+                context_start = max(0, pos - 30)
+                context_end = min(len(text), pos + 100)
+                unsupported_claims.append({
+                    "type": claim_type,
+                    "text": match.group(0),
+                    "context": text[context_start:context_end].strip(),
+                    "position": pos,
+                    "page": (len(text[:pos]) // 3000) + 1
+                })
+    
+    # Limit to most important unsupported claims
+    if len(unsupported_claims) > 10:
+        # Prioritize by claim type importance
+        priority_order = ["Statistical claim", "Research claim", "Established fact claim", "Origin claim", "Prior work reference", "Attribution", "Consensus claim"]
+        unsupported_claims.sort(key=lambda x: priority_order.index(x["type"]) if x["type"] in priority_order else 99)
+        unsupported_claims = unsupported_claims[:10]
+    
+    if unsupported_claims:
+        issues.append({
+            "type": "missing_citation",
+            "severity": "major",
+            "title": f"{len(unsupported_claims)} Potentially Unsupported Claims",
+            "description": "Several statements that typically require citations appear to lack proper references.",
+            "recommendation": "Review flagged statements and add appropriate citations to support claims.",
+            "claims": unsupported_claims[:5]  # Include top 5 examples
+        })
+    
+    # ============ REFERENCE QUALITY ANALYSIS ============
+    
+    years = []
+    for ref in references:
+        if ref.get("year"):
+            try:
+                year = int(ref["year"])
+                if 1900 < year <= 2026:
+                    years.append(year)
+            except ValueError:
+                pass
+    
+    reference_quality = {
+        "total_references": len(references),
+        "verified_count": len(verified_refs),
+        "unverified_count": len(unverified_refs),
+        "avg_year": round(sum(years) / len(years)) if years else None,
+        "newest_year": max(years) if years else None,
+        "oldest_year": min(years) if years else None,
+        "recent_refs_count": len([y for y in years if y >= 2020]),
+        "outdated_refs_count": len([y for y in years if y < 2010])
+    }
+    
+    # Check reference recency
+    if years and reference_quality["avg_year"] and reference_quality["avg_year"] < 2015:
+        issues.append({
+            "type": "recency",
+            "severity": "minor",
+            "title": "Outdated References",
+            "description": f"Average reference year is {reference_quality['avg_year']}. Consider citing more recent work.",
+            "recommendation": "Include recent publications (2020+) to show awareness of current developments in the field."
+        })
+    
+    # ============ CALCULATE CITATION SCORE ============
+    
+    score = 100
+    
+    # Deduct for issues
+    severity_deductions = {"critical": 25, "major": 15, "minor": 5}
+    for issue in issues:
+        score -= severity_deductions.get(issue["severity"], 5)
+    
+    # Bonus for good practices
+    if len(citation_styles_found) == 1:
+        score += 5  # Consistent style
+    if reference_quality["recent_refs_count"] > 5:
+        score += 5  # Good recent references
+    if len(verified_refs) > len(unverified_refs):
+        score += 5  # Most refs verified
+    
+    score = max(0, min(100, score))
+    
+    # Determine risk level
+    if score >= 85:
+        risk_level = "excellent"
+    elif score >= 70:
+        risk_level = "good"
+    elif score >= 50:
+        risk_level = "needs_improvement"
+    else:
+        risk_level = "poor"
+    
+    # ============ LLM ENHANCEMENT ============
+    
+    llm_analysis = None
+    api_key = _get_api_key()
+    
+    if api_key and len(detected_citations) > 0:
+        try:
+            client = OpenAI(api_key=api_key)
+            
+            # Prepare citation summary for LLM
+            citation_summary = f"""
+Document has {len(detected_citations)} citations and {len(references)} references.
+Citation styles found: {', '.join(citation_styles_found)}
+Citation density: {citation_density['citations_per_1000_words']} per 1000 words
+Verified references: {len(verified_refs)}/{len(references[:20])} checked
+Issues detected: {len(issues)}
+
+Sample unsupported claims:
+{json.dumps(unsupported_claims[:3], indent=2) if unsupported_claims else 'None detected'}
+
+Sample references:
+{json.dumps([{'title': r.get('title', 'Unknown')[:60], 'year': r.get('year'), 'verified': r.get('verification', {}).get('verified', False)} for r in references[:5]], indent=2)}
+"""
+            
+            system_msg = """You are an academic citation expert. Analyze the citation practices in this research paper summary and provide:
+1. An overall assessment of citation quality (2-3 sentences)
+2. Specific recommendations for improvement (3-5 items)
+3. A credibility assessment (how well does the paper support its claims with evidence)
+
+Respond ONLY in JSON:
+{
+    "assessment": "Overall assessment text",
+    "recommendations": ["rec1", "rec2", "rec3"],
+    "credibility": "high|medium|low",
+    "credibility_reason": "Brief explanation",
+    "notable_issues": ["issue1", "issue2"]
+}"""
+            
+            response = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {"role": "system", "content": system_msg},
+                    {"role": "user", "content": citation_summary}
+                ],
+                temperature=0.3,
+                max_tokens=500,
+            )
+            
+            raw = response.choices[0].message.content.strip()
+            if "```json" in raw:
+                raw = raw.split("```json")[1].split("```")[0].strip()
+            elif "```" in raw:
+                raw = raw.split("```")[1].split("```")[0].strip()
+            
+            llm_analysis = json.loads(raw)
+            
+        except Exception as exc:
+            _debug("citation_llm.error", str(exc))
+    
+    return {
+        "citation_score": score,
+        "risk_level": risk_level,
+        "total_citations": len(detected_citations),
+        "total_references": len(references),
+        "citations": detected_citations[:50],  # Limit for response size
+        "references": references[:30],
+        "verified_count": len(verified_refs),
+        "unverified_count": len(unverified_refs),
+        "citation_density": citation_density,
+        "page_distribution": dict(page_distribution),
+        "styles_found": list(citation_styles_found),
+        "issues": issues,
+        "unsupported_claims": unsupported_claims[:10],
+        "reference_quality": reference_quality,
+        "llm_analysis": llm_analysis
+    }
+
+
+def parse_reference(ref_text: str, ref_number: int) -> dict:
+    """Parse a reference string to extract structured information."""
+    import re
+    
+    ref_info = {
+        "number": ref_number,
+        "raw_text": ref_text[:300],  # Limit length
+        "title": None,
+        "authors": None,
+        "year": None,
+        "journal": None,
+        "doi": None,
+        "url": None,
+        "potential_self_cite": False
+    }
+    
+    # Extract year
+    year_match = re.search(r'\b(19|20)\d{2}\b', ref_text)
+    if year_match:
+        ref_info["year"] = year_match.group(0)
+    
+    # Extract DOI
+    doi_match = re.search(r'10\.\d{4,}/[^\s]+', ref_text)
+    if doi_match:
+        ref_info["doi"] = doi_match.group(0).rstrip('.,;')
+    
+    # Extract URL
+    url_match = re.search(r'https?://[^\s<>"]+', ref_text)
+    if url_match:
+        ref_info["url"] = url_match.group(0).rstrip('.,;)')
+    
+    # Extract title (usually in quotes or after year)
+    title_match = re.search(r'"([^"]+)"', ref_text)
+    if title_match:
+        ref_info["title"] = title_match.group(1)
+    else:
+        # Try to extract title after authors (before journal/year pattern)
+        parts = ref_text.split('.')
+        if len(parts) >= 2:
+            potential_title = parts[1].strip() if len(parts[1]) > 10 else None
+            if potential_title and not re.match(r'^\d', potential_title):
+                ref_info["title"] = potential_title[:150]
+    
+    # Extract authors (usually at beginning)
+    author_match = re.match(r'^([A-Z][^.]+\.)', ref_text)
+    if author_match:
+        authors_text = author_match.group(1)
+        # Check for et al. or multiple author pattern
+        ref_info["authors"] = authors_text[:100]
+    
+    # Detect potential journal name
+    journal_patterns = [
+        r'(?:journal|proceedings|transactions|conference|symposium|workshop)\s+(?:of|on)\s+[^,.\d]+',
+        r'in\s+([A-Z][^,]+(?:Conference|Workshop|Symposium|Proceedings))',
+    ]
+    for pattern in journal_patterns:
+        match = re.search(pattern, ref_text, re.IGNORECASE)
+        if match:
+            ref_info["journal"] = match.group(0)[:100]
+            break
+    
+    return ref_info
+
+
+def verify_reference(ref: dict) -> dict:
+    """Attempt to verify a reference exists.
+    
+    Uses heuristics and patterns to assess reference validity.
+    In a production system, this would query CrossRef, Google Scholar, etc.
+    """
+    import re
+    
+    verification = {
+        "verified": False,
+        "confidence": 0.0,
+        "source": "heuristic",
+        "issues": []
+    }
+    
+    # If DOI exists, consider it more likely valid
+    if ref.get("doi"):
+        verification["verified"] = True
+        verification["confidence"] = 0.9
+        verification["source"] = "doi_present"
+        return verification
+    
+    # If URL exists and looks like a valid academic source
+    if ref.get("url"):
+        academic_domains = ['doi.org', 'arxiv.org', 'ieee.org', 'acm.org', 'springer.com', 
+                          'sciencedirect.com', 'wiley.com', 'nature.com', 'plos.org',
+                          'ncbi.nlm.nih.gov', 'pubmed', 'researchgate.net', 'academia.edu']
+        url = ref["url"].lower()
+        if any(domain in url for domain in academic_domains):
+            verification["verified"] = True
+            verification["confidence"] = 0.85
+            verification["source"] = "academic_url"
+            return verification
+    
+    # Check for well-formed reference
+    has_authors = ref.get("authors") and len(ref["authors"]) > 5
+    has_year = ref.get("year") and 1900 < int(ref["year"]) <= 2026
+    has_title = ref.get("title") and len(ref["title"]) > 10
+    
+    confidence = 0.0
+    if has_authors:
+        confidence += 0.3
+    if has_year:
+        confidence += 0.25
+    if has_title:
+        confidence += 0.3
+    if ref.get("journal"):
+        confidence += 0.15
+    
+    verification["confidence"] = round(confidence, 2)
+    verification["verified"] = confidence >= 0.6
+    
+    # Flag potential issues
+    if not has_year:
+        verification["issues"].append("Missing or invalid publication year")
+    if not has_title:
+        verification["issues"].append("Title not clearly identifiable")
+    if not has_authors:
+        verification["issues"].append("Authors not clearly specified")
+    
+    return verification
 
 
 def extract_text_from_pdf(pdf_path: str) -> str:
