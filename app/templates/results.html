@@ -7,6 +7,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Sora:wght@400;600;700&display=swap" rel="stylesheet">
+  <!-- PDF.js -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body { width: 100%; min-height: 100%; font-family: 'Space Grotesk', 'Sora', system-ui, -apple-system, sans-serif; }
@@ -40,6 +42,16 @@
     @keyframes shimmer {
       0% { background-position: -200% 0; }
       100% { background-position: 200% 0; }
+    }
+
+    @keyframes scanLine {
+      0% { top: 0; opacity: 1; }
+      100% { top: 100%; opacity: 0.3; }
+    }
+
+    @keyframes highlightPulse {
+      0%, 100% { box-shadow: 0 0 10px rgba(138, 243, 255, 0.5), inset 0 0 10px rgba(138, 243, 255, 0.1); }
+      50% { box-shadow: 0 0 25px rgba(138, 243, 255, 0.8), inset 0 0 20px rgba(138, 243, 255, 0.2); }
     }
 
     /* Background */
@@ -94,7 +106,43 @@
       .main-layout { grid-template-columns: 1fr; }
     }
 
-    /* Text card */
+    /* PDF Viewer Card */
+    .pdf-card { background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 20px; backdrop-filter: blur(16px); box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.06) inset; overflow: hidden; display: flex; flex-direction: column; }
+    .pdf-card-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid rgba(255, 255, 255, 0.08); background: rgba(255, 255, 255, 0.02); }
+    .pdf-card-title { display: flex; align-items: center; gap: 10px; font-size: 16px; font-weight: 600; }
+    .pdf-card-title svg { width: 20px; height: 20px; color: #8af3ff; }
+
+    /* PDF Navigation */
+    .pdf-nav { display: flex; align-items: center; gap: 12px; }
+    .pdf-nav-btn { width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 8px; cursor: pointer; transition: all 0.3s ease; color: #ffffff; }
+    .pdf-nav-btn:hover:not(:disabled) { background: rgba(138, 243, 255, 0.15); border-color: rgba(138, 243, 255, 0.4); }
+    .pdf-nav-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+    .pdf-nav-btn svg { width: 16px; height: 16px; }
+    .pdf-page-info { font-size: 13px; color: #9ca3af; min-width: 80px; text-align: center; }
+    .pdf-page-info span { color: #8af3ff; font-weight: 600; }
+
+    /* PDF Container */
+    .pdf-container { position: relative; flex: 1; display: flex; align-items: center; justify-content: center; padding: 20px; background: rgba(0, 0, 0, 0.2); min-height: 60vh; overflow: hidden; }
+    .pdf-wrapper { position: relative; display: inline-block; box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5); border-radius: 4px; overflow: hidden; }
+    #pdf-canvas { display: block; max-width: 100%; height: auto; }
+
+    /* Highlight Overlay */
+    .highlight-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; }
+    .highlight-box { position: absolute; background: rgba(138, 243, 255, 0.2); border: 2px solid rgba(138, 243, 255, 0.6); border-radius: 4px; opacity: 0; transition: all 0.4s ease; }
+    .highlight-box.active { opacity: 1; animation: highlightPulse 1.5s ease-in-out infinite; }
+
+    /* Scan Line Effect */
+    .scan-line { position: absolute; top: 0; left: 0; width: 100%; height: 3px; background: linear-gradient(90deg, transparent, rgba(138, 243, 255, 0.8), transparent); pointer-events: none; opacity: 0; z-index: 11; }
+    .scan-line.active { animation: scanLine 1.5s ease-in-out; }
+
+    /* Connection Line */
+    .connection-line { position: fixed; pointer-events: none; z-index: 100; opacity: 0; transition: opacity 0.3s ease; }
+    .connection-line.active { opacity: 1; }
+    .connection-line svg { overflow: visible; }
+    .connection-line path { stroke: #8af3ff; stroke-width: 2; fill: none; stroke-dasharray: 8 4; animation: dashMove 0.5s linear infinite; }
+    @keyframes dashMove { to { stroke-dashoffset: -12; } }
+
+    /* Text fallback card */
     .text-card { background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 20px; backdrop-filter: blur(16px); box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.06) inset; overflow: hidden; display: flex; flex-direction: column; }
     .text-card-header { display: flex; align-items: center; justify-content: space-between; padding: 16px 20px; border-bottom: 1px solid rgba(255, 255, 255, 0.08); background: rgba(255, 255, 255, 0.02); }
     .text-card-title { display: flex; align-items: center; gap: 10px; font-size: 16px; font-weight: 600; }
@@ -216,6 +264,10 @@
     /* Loading state */
     .loading-shimmer { background: linear-gradient(90deg, rgba(255,255,255,0.03) 25%, rgba(255,255,255,0.08) 50%, rgba(255,255,255,0.03) 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; }
 
+    .pdf-loading { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; color: #9ca3af; }
+    .pdf-loading-spinner { width: 40px; height: 40px; border: 3px solid rgba(138, 243, 255, 0.2); border-top-color: #8af3ff; border-radius: 50%; animation: spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
     /* Empty state */
     .empty-state { text-align: center; padding: 40px 20px; color: #6b7280; }
     .empty-state svg { width: 48px; height: 48px; margin-bottom: 16px; opacity: 0.5; }
@@ -230,7 +282,7 @@
 
     /* Responsive */
     @media (max-width: 640px) {
-      .text-card-header, .suggestions-header { flex-direction: column; gap: 12px; align-items: flex-start; }
+      .pdf-card-header, .text-card-header, .suggestions-header { flex-direction: column; gap: 12px; align-items: flex-start; }
       .actions { flex-direction: column; }
       .actions .btn { width: 100%; justify-content: center; }
       .summary-lists { grid-template-columns: 1fr; }
@@ -256,6 +308,13 @@
     <div class="tooltip-title"></div>
     <div class="tooltip-desc"></div>
     <div class="tooltip-fix"></div>
+  </div>
+
+  <!-- Connection line for mapping animation -->
+  <div id="connection-line" class="connection-line">
+    <svg width="100%" height="100%">
+      <path id="connection-path" d="" />
+    </svg>
   </div>
 
   <div class="content">
@@ -299,7 +358,40 @@
       </div>
 
       <div class="main-layout">
-        <!-- Extracted Text Column -->
+        <!-- PDF Viewer Column -->
+        {% if is_pdf and pdf_base64 %}
+        <div class="pdf-card" id="pdf-card">
+          <div class="pdf-card-header">
+            <div class="pdf-card-title">
+              <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+              Document Preview
+            </div>
+            <div class="pdf-nav">
+              <button class="pdf-nav-btn" id="prev-page" disabled title="Previous Page">
+                <svg viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"></polyline></svg>
+              </button>
+              <div class="pdf-page-info">
+                Page <span id="current-page">1</span> of <span id="total-pages">-</span>
+              </div>
+              <button class="pdf-nav-btn" id="next-page" title="Next Page">
+                <svg viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"></polyline></svg>
+              </button>
+            </div>
+          </div>
+          <div class="pdf-container" id="pdf-container">
+            <div class="pdf-loading" id="pdf-loading">
+              <div class="pdf-loading-spinner"></div>
+              <span>Loading PDF...</span>
+            </div>
+            <div class="pdf-wrapper" id="pdf-wrapper" style="display: none;">
+              <canvas id="pdf-canvas"></canvas>
+              <div class="highlight-overlay" id="highlight-overlay"></div>
+              <div class="scan-line" id="scan-line"></div>
+            </div>
+          </div>
+        </div>
+        {% else %}
+        <!-- Text fallback for non-PDF files -->
         <div class="text-card">
           <div class="text-card-header">
             <div class="text-card-title">
@@ -319,9 +411,10 @@
             <pre id="extracted-text">{{ extracted_text }}</pre>
           </div>
         </div>
+        {% endif %}
 
         <!-- Formatting Suggestions Column -->
-        <div class="suggestions-panel">
+        <div class="suggestions-panel" id="suggestions-panel">
           <div class="suggestions-header">
             <div class="suggestions-title">
               <svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
@@ -331,7 +424,7 @@
 
           {% if formatting_data and formatting_data.pages %}
           <!-- Page tabs -->
-          <div class="page-tabs">
+          <div class="page-tabs" id="page-tabs">
             <button class="page-tab active" data-page="overall">
               Overview
             </button>
@@ -385,7 +478,8 @@
               <div class="suggestion-card" 
                    data-title="{{ suggestion.title }}"
                    data-description="{{ suggestion.description | default('') }}"
-                   data-fix="">
+                   data-fix=""
+                   data-page="0">
                 <div class="suggestion-header">
                   <div class="severity-icon severity-{{ suggestion.priority | default('medium') | replace('high', 'major') | replace('medium', 'minor') | replace('low', 'info') }}">
                     <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5z"></path><path d="M2 17l10 5 10-5"></path></svg>
@@ -421,8 +515,11 @@
                    data-description="{{ suggestion.description | default('') }}"
                    data-fix="{{ suggestion.fix | default('') }}"
                    data-affected="{{ suggestion.affected_text | default('') }}"
-                   data-char-start="{{ page.char_start }}"
-                   data-char-end="{{ page.char_end }}">
+                   data-page="{{ page.page_number }}"
+                   data-location-y="{{ suggestion.location_y | default(0.3) }}"
+                   data-location-x="{{ suggestion.location_x | default(0.5) }}"
+                   data-location-width="{{ suggestion.location_width | default(0.4) }}"
+                   data-location-height="{{ suggestion.location_height | default(0.05) }}">
                 <div class="suggestion-header">
                   <div class="severity-icon severity-{{ suggestion.severity | default('info') }}">
                     {% if suggestion.severity == 'critical' %}
@@ -500,10 +597,132 @@
   </div>
 
   <script>
+    // PDF.js initialization
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+    // Store extracted text for download
+    const extractedText = {{ extracted_text | tojson }};
+    const isPdf = {{ is_pdf | tojson if is_pdf is defined else 'false' }};
+    const pdfBase64 = {{ pdf_base64 | tojson if pdf_base64 else 'null' }};
+
+    // PDF Viewer State
+    let pdfDoc = null;
+    let currentPage = 1;
+    let totalPages = 0;
+    let scale = 1.5;
+    let rendering = false;
+
+    // DOM Elements
+    const pdfCanvas = document.getElementById('pdf-canvas');
+    const pdfContainer = document.getElementById('pdf-container');
+    const pdfWrapper = document.getElementById('pdf-wrapper');
+    const pdfLoading = document.getElementById('pdf-loading');
+    const highlightOverlay = document.getElementById('highlight-overlay');
+    const scanLine = document.getElementById('scan-line');
+    const connectionLine = document.getElementById('connection-line');
+    const connectionPath = document.getElementById('connection-path');
+    const prevBtn = document.getElementById('prev-page');
+    const nextBtn = document.getElementById('next-page');
+    const currentPageSpan = document.getElementById('current-page');
+    const totalPagesSpan = document.getElementById('total-pages');
+
+    // Initialize PDF if available
+    if (isPdf && pdfBase64) {
+      loadPdf();
+    }
+
+    async function loadPdf() {
+      try {
+        const pdfData = atob(pdfBase64);
+        const pdfArray = new Uint8Array(pdfData.length);
+        for (let i = 0; i < pdfData.length; i++) {
+          pdfArray[i] = pdfData.charCodeAt(i);
+        }
+
+        pdfDoc = await pdfjsLib.getDocument({ data: pdfArray }).promise;
+        totalPages = pdfDoc.numPages;
+        totalPagesSpan.textContent = totalPages;
+
+        // Render first page
+        await renderPage(1);
+
+        // Show PDF
+        pdfLoading.style.display = 'none';
+        pdfWrapper.style.display = 'block';
+
+        // Enable/disable navigation
+        updateNavButtons();
+      } catch (error) {
+        console.error('PDF loading error:', error);
+        pdfLoading.innerHTML = '<span style="color: #ef4444;">Failed to load PDF</span>';
+      }
+    }
+
+    async function renderPage(pageNum) {
+      if (rendering) return;
+      rendering = true;
+
+      try {
+        const page = await pdfDoc.getPage(pageNum);
+        
+        // Calculate scale to fit container
+        const containerWidth = pdfContainer.clientWidth - 40;
+        const containerHeight = pdfContainer.clientHeight - 40;
+        
+        const viewport = page.getViewport({ scale: 1 });
+        const scaleX = containerWidth / viewport.width;
+        const scaleY = containerHeight / viewport.height;
+        scale = Math.min(scaleX, scaleY, 2);
+
+        const scaledViewport = page.getViewport({ scale });
+        
+        pdfCanvas.width = scaledViewport.width;
+        pdfCanvas.height = scaledViewport.height;
+
+        const ctx = pdfCanvas.getContext('2d');
+        await page.render({
+          canvasContext: ctx,
+          viewport: scaledViewport
+        }).promise;
+
+        currentPage = pageNum;
+        currentPageSpan.textContent = pageNum;
+        updateNavButtons();
+
+        // Clear highlights when changing pages
+        clearHighlights();
+      } catch (error) {
+        console.error('Page render error:', error);
+      } finally {
+        rendering = false;
+      }
+    }
+
+    function updateNavButtons() {
+      if (prevBtn) prevBtn.disabled = currentPage <= 1;
+      if (nextBtn) nextBtn.disabled = currentPage >= totalPages;
+    }
+
+    // Navigation event listeners
+    if (prevBtn) {
+      prevBtn.addEventListener('click', () => {
+        if (currentPage > 1) {
+          renderPage(currentPage - 1);
+        }
+      });
+    }
+
+    if (nextBtn) {
+      nextBtn.addEventListener('click', () => {
+        if (currentPage < totalPages) {
+          renderPage(currentPage + 1);
+        }
+      });
+    }
+
     // Text functions
     function copyText() {
-      const text = document.getElementById('extracted-text').innerText;
-      navigator.clipboard.writeText(text).then(() => {
+      navigator.clipboard.writeText(extractedText).then(() => {
         showNotification('Text copied to clipboard!');
       }).catch(err => {
         console.error('Failed to copy:', err);
@@ -511,9 +730,8 @@
     }
 
     function downloadText() {
-      const text = document.getElementById('extracted-text').innerText;
       const filename = '{{ filename }}'.replace(/\.[^/.]+$/, '') + '_extracted.txt';
-      const blob = new Blob([text], { type: 'text/plain' });
+      const blob = new Blob([extractedText], { type: 'text/plain' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -571,26 +789,144 @@
             ps.classList.remove('active');
           }
         });
+
+        // If PDF and page number, navigate to that page
+        if (isPdf && pdfDoc && pageNum !== 'overall') {
+          const targetPage = parseInt(pageNum);
+          if (targetPage && targetPage !== currentPage) {
+            renderPage(targetPage);
+          }
+        }
       });
     });
 
-    // Suggestion card expand/collapse
+    // Suggestion card expand/collapse and highlight mapping
     const suggestionCards = document.querySelectorAll('.suggestion-card');
-    
+
     suggestionCards.forEach(card => {
       card.addEventListener('click', (e) => {
-        // Toggle expanded state
         const wasExpanded = card.classList.contains('expanded');
-        
-        // Collapse all other cards
         suggestionCards.forEach(c => c.classList.remove('expanded'));
-        
-        // Toggle this card
         if (!wasExpanded) {
           card.classList.add('expanded');
         }
       });
+
+      // Hover effects with PDF highlight mapping
+      card.addEventListener('mouseenter', () => {
+        if (isPdf && pdfDoc) {
+          const pageNum = parseInt(card.dataset.page);
+          
+          // Navigate to the relevant page if needed
+          if (pageNum && pageNum !== currentPage && pageNum > 0) {
+            renderPage(pageNum).then(() => {
+              showHighlightOnPdf(card);
+            });
+          } else if (pageNum > 0) {
+            showHighlightOnPdf(card);
+          }
+        }
+      });
+
+      card.addEventListener('mouseleave', () => {
+        clearHighlights();
+        hideConnectionLine();
+      });
     });
+
+    function showHighlightOnPdf(card) {
+      if (!highlightOverlay || !pdfCanvas) return;
+
+      // Get location data from card (normalized 0-1 values)
+      const locY = parseFloat(card.dataset.locationY) || 0.3;
+      const locX = parseFloat(card.dataset.locationX) || 0.1;
+      const locWidth = parseFloat(card.dataset.locationWidth) || 0.8;
+      const locHeight = parseFloat(card.dataset.locationHeight) || 0.06;
+
+      // Clear existing highlights
+      highlightOverlay.innerHTML = '';
+
+      // Create highlight box
+      const highlightBox = document.createElement('div');
+      highlightBox.className = 'highlight-box';
+      
+      // Position based on normalized coordinates (0-1 range)
+      highlightBox.style.left = (locX * 100) + '%';
+      highlightBox.style.top = (locY * 100) + '%';
+      highlightBox.style.width = (locWidth * 100) + '%';
+      highlightBox.style.height = Math.max(locHeight * 100, 3) + '%';
+
+      highlightOverlay.appendChild(highlightBox);
+
+      // Animate in
+      requestAnimationFrame(() => {
+        highlightBox.classList.add('active');
+      });
+
+      // Show scan line effect
+      if (scanLine) {
+        scanLine.style.top = '0';
+        scanLine.classList.add('active');
+        setTimeout(() => {
+          scanLine.classList.remove('active');
+        }, 1500);
+      }
+
+      // Draw connection line after a short delay to ensure highlight is rendered
+      setTimeout(() => {
+        drawConnectionLine(card, highlightBox);
+      }, 50);
+    }
+
+    function drawConnectionLine(card, highlightBox) {
+      if (!connectionLine || !connectionPath) return;
+
+      // Get bounding rectangles
+      const cardRect = card.getBoundingClientRect();
+      const highlightRect = highlightBox.getBoundingClientRect();
+      const pdfWrapperRect = pdfWrapper ? pdfWrapper.getBoundingClientRect() : null;
+
+      // Check if elements are visible
+      if (!highlightRect.width || !highlightRect.height) return;
+
+      // Start point: left center of the suggestion card
+      const startX = cardRect.left;
+      const startY = cardRect.top + (cardRect.height / 2);
+
+      // End point: right center of the highlight box
+      const endX = highlightRect.right;
+      const endY = highlightRect.top + (highlightRect.height / 2);
+
+      // Calculate control points for smooth curve
+      const deltaX = Math.abs(startX - endX);
+      const controlOffset = Math.min(deltaX * 0.4, 150);
+
+      // Create path from highlight to card (right to left)
+      const pathD = `M ${endX} ${endY} C ${endX + controlOffset} ${endY}, ${startX - controlOffset} ${startY}, ${startX} ${startY}`;
+      
+      connectionPath.setAttribute('d', pathD);
+      
+      // Position SVG to cover the entire viewport
+      connectionLine.style.position = 'fixed';
+      connectionLine.style.width = '100vw';
+      connectionLine.style.height = '100vh';
+      connectionLine.style.left = '0';
+      connectionLine.style.top = '0';
+      connectionLine.style.pointerEvents = 'none';
+      connectionLine.classList.add('active');
+    }
+
+    function clearHighlights() {
+      if (highlightOverlay) {
+        highlightOverlay.innerHTML = '';
+      }
+    }
+
+    function hideConnectionLine() {
+      if (connectionLine) {
+        connectionLine.classList.remove('active');
+      }
+    }
 
     // Tooltip functionality
     const tooltip = document.getElementById('tooltip');
@@ -636,7 +972,6 @@
       const x = e.clientX + 15;
       const y = e.clientY + 15;
       
-      // Keep tooltip in viewport
       const tooltipRect = tooltip.getBoundingClientRect();
       const maxX = window.innerWidth - tooltipRect.width - 20;
       const maxY = window.innerHeight - tooltipRect.height - 20;
@@ -645,69 +980,34 @@
       tooltip.style.top = Math.min(y, maxY) + 'px';
     }
 
-    // Highlight affected text on hover
-    const textContent = document.getElementById('extracted-text');
-    const originalText = textContent.textContent;
-
-    suggestionCards.forEach(card => {
-      const affectedText = card.dataset.affected;
-      
-      if (affectedText && affectedText.length > 3) {
-        card.addEventListener('mouseenter', () => {
-          highlightText(affectedText);
-        });
-        
-        card.addEventListener('mouseleave', () => {
-          removeHighlights();
-        });
-      }
-    });
-
-    function highlightText(searchText) {
-      if (!searchText || searchText.length < 3) return;
-      
-      // Clean the search text
-      const cleanSearch = searchText.replace(/\.\.\.$/, '').trim();
-      if (cleanSearch.length < 3) return;
-      
-      const text = textContent.textContent;
-      const lowerText = text.toLowerCase();
-      const lowerSearch = cleanSearch.toLowerCase();
-      
-      const index = lowerText.indexOf(lowerSearch);
-      if (index !== -1) {
-        const before = text.substring(0, index);
-        const match = text.substring(index, index + cleanSearch.length);
-        const after = text.substring(index + cleanSearch.length);
-        
-        textContent.innerHTML = escapeHtml(before) + 
-          '<span class="highlight active">' + escapeHtml(match) + '</span>' + 
-          escapeHtml(after);
-        
-        // Scroll to highlighted text
-        const highlight = textContent.querySelector('.highlight');
-        if (highlight) {
-          highlight.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
-      }
-    }
-
-    function removeHighlights() {
-      textContent.textContent = originalText;
-    }
-
-    function escapeHtml(text) {
-      const div = document.createElement('div');
-      div.textContent = text;
-      return div.innerHTML;
-    }
-
     // Keyboard navigation
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape') {
         suggestionCards.forEach(c => c.classList.remove('expanded'));
         tooltip.classList.remove('visible');
+        clearHighlights();
+        hideConnectionLine();
       }
+      
+      // Arrow keys for PDF navigation
+      if (isPdf && pdfDoc) {
+        if (e.key === 'ArrowLeft' && currentPage > 1) {
+          renderPage(currentPage - 1);
+        } else if (e.key === 'ArrowRight' && currentPage < totalPages) {
+          renderPage(currentPage + 1);
+        }
+      }
+    });
+
+    // Resize handler
+    let resizeTimeout;
+    window.addEventListener('resize', () => {
+      clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(() => {
+        if (isPdf && pdfDoc && currentPage) {
+          renderPage(currentPage);
+        }
+      }, 200);
     });
   </script>
 </body>

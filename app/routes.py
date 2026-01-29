@@ -1063,9 +1063,19 @@ def upload():
         temp_path = tmp.name
 
     text = ""
+    pdf_base64 = None
+    pdf_positions = None
+    is_pdf = ext == ".pdf"
+    
     try:
         if ext == ".pdf":
             text = extract_text_from_pdf(temp_path)
+            # Extract text positions for accurate highlight mapping
+            pdf_positions = extract_pdf_text_with_positions(temp_path)
+            # Read PDF file as base64 for frontend rendering
+            with open(temp_path, "rb") as pdf_file:
+                import base64
+                pdf_base64 = base64.b64encode(pdf_file.read()).decode("utf-8")
         elif ext in {".doc", ".docx"}:
             text = extract_text_from_docx(temp_path)
         else:
@@ -1083,8 +1093,8 @@ def upload():
 
     _debug("upload.extracted_text_len", len(extracted_text))
 
-    # Analyze formatting suggestions
-    formatting_data = analyze_formatting_suggestions(extracted_text, filename)
+    # Analyze formatting suggestions with position data
+    formatting_data = analyze_formatting_suggestions(extracted_text, filename, pdf_positions)
     _debug("upload.formatting_score", formatting_data.get("score", 0))
 
     return render_template(
@@ -1094,6 +1104,8 @@ def upload():
         word_count=len(extracted_text.split()),
         char_count=len(extracted_text),
         formatting_data=formatting_data,
+        pdf_base64=pdf_base64,
+        is_pdf=is_pdf,
     )
 
 
@@ -1789,11 +1801,136 @@ def build_roadmap(extracted_text: str, characters: list, general_questions: list
         return default_steps
 
 
-def analyze_formatting_suggestions(text: str, filename: str = "") -> dict:
+def extract_pdf_text_with_positions(pdf_path: str) -> dict:
+    """Extract text from PDF with position information for each page.
+    
+    Returns dict with:
+    - pages: list of page data with words, lines, and bounding boxes
+    - page_dimensions: list of (width, height) for each page
+    """
+    if not PDFPLUMBER_AVAILABLE:
+        return {"pages": [], "page_dimensions": []}
+    
+    result = {"pages": [], "page_dimensions": []}
+    
+    try:
+        with pdfplumber.open(pdf_path) as pdf:
+            for page_num, page in enumerate(pdf.pages, 1):
+                page_width = float(page.width)
+                page_height = float(page.height)
+                result["page_dimensions"].append((page_width, page_height))
+                
+                page_data = {
+                    "page_number": page_num,
+                    "width": page_width,
+                    "height": page_height,
+                    "words": [],
+                    "lines": [],
+                    "text": ""
+                }
+                
+                # Extract words with bounding boxes
+                words = page.extract_words(keep_blank_chars=True, use_text_flow=True)
+                for word in words:
+                    page_data["words"].append({
+                        "text": word.get("text", ""),
+                        "x0": word.get("x0", 0) / page_width,  # Normalize to 0-1
+                        "y0": word.get("top", 0) / page_height,
+                        "x1": word.get("x1", 0) / page_width,
+                        "y1": word.get("bottom", 0) / page_height,
+                    })
+                
+                # Group words into lines (same y position)
+                if words:
+                    current_line = []
+                    current_y = None
+                    tolerance = 5  # pixels tolerance for same line
+                    
+                    for word in sorted(words, key=lambda w: (w.get("top", 0), w.get("x0", 0))):
+                        word_y = word.get("top", 0)
+                        if current_y is None or abs(word_y - current_y) <= tolerance:
+                            current_line.append(word)
+                            current_y = word_y if current_y is None else current_y
+                        else:
+                            if current_line:
+                                line_text = " ".join(w.get("text", "") for w in current_line)
+                                page_data["lines"].append({
+                                    "text": line_text,
+                                    "x0": min(w.get("x0", 0) for w in current_line) / page_width,
+                                    "y0": min(w.get("top", 0) for w in current_line) / page_height,
+                                    "x1": max(w.get("x1", 0) for w in current_line) / page_width,
+                                    "y1": max(w.get("bottom", 0) for w in current_line) / page_height,
+                                    "word_count": len(current_line)
+                                })
+                            current_line = [word]
+                            current_y = word_y
+                    
+                    # Don't forget the last line
+                    if current_line:
+                        line_text = " ".join(w.get("text", "") for w in current_line)
+                        page_data["lines"].append({
+                            "text": line_text,
+                            "x0": min(w.get("x0", 0) for w in current_line) / page_width,
+                            "y0": min(w.get("top", 0) for w in current_line) / page_height,
+                            "x1": max(w.get("x1", 0) for w in current_line) / page_width,
+                            "y1": max(w.get("bottom", 0) for w in current_line) / page_height,
+                            "word_count": len(current_line)
+                        })
+                
+                page_data["text"] = page.extract_text() or ""
+                result["pages"].append(page_data)
+                
+    except Exception as exc:
+        _debug("extract_pdf_positions.error", str(exc))
+    
+    return result
+
+
+def find_text_position_in_page(search_text: str, page_data: dict) -> dict:
+    """Find the position of text within a page's extracted data.
+    
+    Returns normalized coordinates (0-1 range) or None if not found.
+    """
+    if not search_text or not page_data.get("lines"):
+        return None
+    
+    search_lower = search_text.lower().strip()[:50]  # Limit search length
+    
+    # First try to find in lines
+    for line in page_data["lines"]:
+        line_text = line.get("text", "").lower()
+        if search_lower in line_text:
+            return {
+                "x": line["x0"],
+                "y": line["y0"],
+                "width": line["x1"] - line["x0"],
+                "height": line["y1"] - line["y0"]
+            }
+    
+    # Try word-level search
+    for word in page_data.get("words", []):
+        word_text = word.get("text", "").lower()
+        if search_lower.split()[0] in word_text if search_lower.split() else False:
+            return {
+                "x": word["x0"],
+                "y": word["y0"],
+                "width": word["x1"] - word["x0"],
+                "height": word["y1"] - word["y0"]
+            }
+    
+    return None
+
+
+def analyze_formatting_suggestions(text: str, filename: str = "", pdf_positions: dict = None) -> dict:
     """Analyze document text and generate formatting/alignment suggestions using AI.
     
+    Args:
+        text: Extracted text from the document
+        filename: Original filename
+        pdf_positions: Optional dict from extract_pdf_text_with_positions for accurate mapping
+    
     Returns a dict with:
-    - pages: list of page-level suggestions
+    - pages: list of page-level suggestions with accurate position data
     - overall: overall document suggestions
     - score: formatting quality score 0-100
     """
@@ -1806,6 +1943,8 @@ def analyze_formatting_suggestions(text: str, filename: str = "") -> dict:
             "error": None
         }
     
+    import re  # For regex matching in position calculation
+    
     # Split text into approximate pages (roughly 3000 chars per page)
     page_size = 3000
     pages_text = []
@@ -1816,6 +1955,10 @@ def analyze_formatting_suggestions(text: str, filename: str = "") -> dict:
     
     if not pages_text:
         pages_text = [text]
+    
+    # Use actual PDF pages if available
+    if pdf_positions and pdf_positions.get("pages"):
+        pages_text = [p.get("text", "") for p in pdf_positions["pages"] if p.get("text")]
     
     # Try AI-based analysis first
     api_key = _get_api_key()
@@ -1887,6 +2030,71 @@ Provide 3-7 suggestions per page, prioritizing the most impactful issues."""
                 page_data["page_number"] = page_num
                 page_data["char_start"] = (page_num - 1) * page_size
                 page_data["char_end"] = min(page_num * page_size, len(text))
+                
+                # Calculate positions for each suggestion
+                if pdf_positions and page_num <= len(pdf_positions.get("pages", [])):
+                    pdf_page_data = pdf_positions["pages"][page_num - 1]
+                    lines = pdf_page_data.get("lines", [])
+                    total_lines = len(lines)
+                    
+                    for idx, suggestion in enumerate(page_data.get("suggestions", [])):
+                        affected_text = suggestion.get("affected_text", "")
+                        location_desc = suggestion.get("location", "").lower()
+                        
+                        # Try to find position by affected text first
+                        if affected_text:
+                            pos = find_text_position_in_page(affected_text, pdf_page_data)
+                            if pos:
+                                suggestion["location_x"] = pos["x"]
+                                suggestion["location_y"] = pos["y"]
+                                suggestion["location_width"] = min(pos["width"] + 0.1, 0.9 - pos["x"])
+                                suggestion["location_height"] = min(pos["height"] + 0.02, 0.1)
+                                continue
+                        
+                        # Parse location description for line/paragraph numbers
+                        line_match = re.search(r'line\s*(\d+)', location_desc)
+                        para_match = re.search(r'paragraph\s*(\d+)', location_desc)
+                        
+                        if line_match and total_lines > 0:
+                            line_num = min(int(line_match.group(1)), total_lines) - 1
+                            if 0 <= line_num < total_lines:
+                                line_data = lines[line_num]
+                                suggestion["location_x"] = line_data["x0"]
+                                suggestion["location_y"] = line_data["y0"]
+                                suggestion["location_width"] = line_data["x1"] - line_data["x0"]
+                                suggestion["location_height"] = line_data["y1"] - line_data["y0"] + 0.01
+                                continue
+                        
+                        if para_match and total_lines > 0:
+                            # Estimate paragraph position (assume ~5 lines per paragraph)
+                            para_num = int(para_match.group(1))
+                            est_line = min((para_num - 1) * 5, total_lines - 1)
+                            if 0 <= est_line < total_lines:
+                                line_data = lines[est_line]
+                                suggestion["location_x"] = line_data["x0"]
+                                suggestion["location_y"] = line_data["y0"]
+                                suggestion["location_width"] = 0.85
+                                # Cover multiple lines for paragraph
+                                end_line = min(est_line + 4, total_lines - 1)
+                                suggestion["location_height"] = lines[end_line]["y1"] - line_data["y0"]
+                                continue
+                        
+                        # Position based on keywords in location
+                        if "beginning" in location_desc or "start" in location_desc or "top" in location_desc:
+                            y_pos = 0.1
+                        elif "end" in location_desc or "bottom" in location_desc:
+                            y_pos = 0.75
+                        elif "middle" in location_desc or "center" in location_desc:
+                            y_pos = 0.4
+                        else:
+                            # Distribute suggestions evenly down the page
+                            y_pos = 0.1 + (idx * 0.12)
+                        
+                        suggestion["location_x"] = 0.08
+                        suggestion["location_y"] = min(y_pos, 0.85)
+                        suggestion["location_width"] = 0.84
+                        suggestion["location_height"] = 0.04
+                
                 pages_suggestions.append(page_data)
             
             # Generate overall document suggestions
@@ -1942,10 +2150,10 @@ Respond ONLY in JSON:
             _debug("formatting_analysis.ai_error", str(exc))
     
     # Fallback: Rule-based analysis
-    return _analyze_formatting_rules(text, pages_text, filename)
+    return _analyze_formatting_rules(text, pages_text, filename, pdf_positions)
 
 
-def _analyze_formatting_rules(text: str, pages_text: list, filename: str) -> dict:
+def _analyze_formatting_rules(text: str, pages_text: list, filename: str, pdf_positions: dict = None) -> dict:
     """Rule-based formatting analysis fallback when AI is unavailable."""
     
     import re
@@ -1955,11 +2163,16 @@ def _analyze_formatting_rules(text: str, pages_text: list, filename: str) -> dic
     for page_num, page_text in enumerate(pages_text[:10], 1):
         suggestions = []
         
+        # Get PDF page data for positioning if available
+        pdf_page_data = None
+        if pdf_positions and page_num <= len(pdf_positions.get("pages", [])):
+            pdf_page_data = pdf_positions["pages"][page_num - 1]
+        
         # Check for very long paragraphs (>500 chars without line break)
         paragraphs = page_text.split('\n\n')
         for i, para in enumerate(paragraphs):
             if len(para) > 500:
-                suggestions.append({
+                suggestion = {
                     "type": "paragraph",
                     "severity": "minor",
                     "title": "Long paragraph detected",
@@ -1967,7 +2180,27 @@ def _analyze_formatting_rules(text: str, pages_text: list, filename: str) -> dic
                     "location": f"Paragraph {i+1}",
                     "fix": "Split into 2-3 shorter paragraphs with clear topic sentences.",
                     "affected_text": para[:50] + "..." if len(para) > 50 else para
-                })
+                }
+                # Calculate position
+                if pdf_page_data:
+                    pos = find_text_position_in_page(para[:50], pdf_page_data)
+                    if pos:
+                        suggestion["location_x"] = pos["x"]
+                        suggestion["location_y"] = pos["y"]
+                        suggestion["location_width"] = 0.84
+                        suggestion["location_height"] = 0.08
+                    else:
+                        # Estimate based on paragraph index
+                        suggestion["location_x"] = 0.08
+                        suggestion["location_y"] = 0.1 + (i * 0.15)
+                        suggestion["location_width"] = 0.84
+                        suggestion["location_height"] = 0.08
+                else:
+                    suggestion["location_x"] = 0.08
+                    suggestion["location_y"] = 0.1 + (i * 0.15)
+                    suggestion["location_width"] = 0.84
+                    suggestion["location_height"] = 0.08
+                suggestions.append(suggestion)
         
         # Check for inconsistent spacing
         if '  ' in page_text:
@@ -2055,6 +2288,52 @@ def _analyze_formatting_rules(text: str, pages_text: list, filename: str) -> dic
         severity_scores = {"critical": 20, "major": 10, "minor": 5, "info": 2}
         deductions = sum(severity_scores.get(s.get("severity", "info"), 0) for s in suggestions)
         page_score = max(40, 100 - deductions)
+        
+        # Add position data to all suggestions that don't have it
+        for idx, suggestion in enumerate(suggestions):
+            if "location_x" not in suggestion:
+                affected_text = suggestion.get("affected_text", "")
+                location_desc = suggestion.get("location", "").lower()
+                
+                # Try to find by affected text
+                if pdf_page_data and affected_text:
+                    pos = find_text_position_in_page(affected_text, pdf_page_data)
+                    if pos:
+                        suggestion["location_x"] = pos["x"]
+                        suggestion["location_y"] = pos["y"]
+                        suggestion["location_width"] = min(0.84, pos["width"] + 0.2)
+                        suggestion["location_height"] = min(0.06, pos["height"] + 0.02)
+                        continue
+                
+                # Try to find by line number
+                if pdf_page_data and pdf_page_data.get("lines"):
+                    lines = pdf_page_data["lines"]
+                    total_lines = len(lines)
+                    
+                    line_match = re.search(r'line\s*(\d+)', location_desc)
+                    if line_match and total_lines > 0:
+                        line_num = min(int(line_match.group(1)), total_lines) - 1
+                        if 0 <= line_num < total_lines:
+                            line_data = lines[line_num]
+                            suggestion["location_x"] = line_data["x0"]
+                            suggestion["location_y"] = line_data["y0"]
+                            suggestion["location_width"] = line_data["x1"] - line_data["x0"]
+                            suggestion["location_height"] = line_data["y1"] - line_data["y0"] + 0.01
+                            continue
+                
+                # Default: distribute evenly with some variety
+                y_offset = 0.08 + (idx * 0.11)
+                if "throughout" in location_desc or "multiple" in location_desc:
+                    y_offset = 0.35 + (idx * 0.05)
+                elif "beginning" in location_desc or "start" in location_desc:
+                    y_offset = 0.08 + (idx * 0.03)
+                elif "end" in location_desc:
+                    y_offset = 0.7 + (idx * 0.03)
+                
+                suggestion["location_x"] = 0.08
+                suggestion["location_y"] = min(y_offset, 0.85)
+                suggestion["location_width"] = 0.84
+                suggestion["location_height"] = 0.045
         
         pages_suggestions.append({
             "page_number": page_num,
