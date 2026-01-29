@@ -2485,8 +2485,471 @@ def _analyze_formatting_rules(text: str, pages_text: list, filename: str, pdf_po
 
 
 # ============================================================================
-# PLAGIARISM DETECTION SYSTEM
+# PLAGIARISM DETECTION SYSTEM - ENHANCED VERSION
 # ============================================================================
+
+def _web_search_check(query: str, num_results: int = 5) -> list:
+    """
+    Search the web for matching content using DuckDuckGo (no API key required).
+    Returns list of potential source matches.
+    """
+    import urllib.request
+    import urllib.parse
+    
+    results = []
+    
+    # Clean and truncate query for search
+    query_clean = " ".join(query.split()[:15])  # First 15 words
+    
+    try:
+        # Use DuckDuckGo HTML search (no API needed)
+        encoded_query = urllib.parse.quote_plus(query_clean)
+        url = f"https://html.duckduckgo.com/html/?q={encoded_query}"
+        
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+        
+        req = urllib.request.Request(url, headers=headers)
+        
+        with urllib.request.urlopen(req, timeout=10) as response:
+            html = response.read().decode('utf-8', errors='ignore')
+            
+            # Parse results from HTML
+            import re
+            
+            # Extract result snippets and URLs
+            result_pattern = r'<a[^>]*class="result__a"[^>]*href="([^"]*)"[^>]*>([^<]*)</a>'
+            snippet_pattern = r'<a[^>]*class="result__snippet"[^>]*>([^<]*)</a>'
+            
+            urls = re.findall(result_pattern, html)
+            snippets = re.findall(snippet_pattern, html)
+            
+            for i, (url_match, title) in enumerate(urls[:num_results]):
+                snippet = snippets[i] if i < len(snippets) else ""
+                
+                # Clean up the URL (DuckDuckGo redirects)
+                actual_url = url_match
+                if "uddg=" in url_match:
+                    url_parts = urllib.parse.parse_qs(urllib.parse.urlparse(url_match).query)
+                    actual_url = url_parts.get('uddg', [url_match])[0]
+                
+                results.append({
+                    "url": actual_url,
+                    "title": title.strip(),
+                    "snippet": snippet.strip(),
+                    "source": "web"
+                })
+                
+    except Exception as exc:
+        _debug("web_search.error", str(exc))
+    
+    return results
+
+
+def _google_scholar_check(query: str) -> list:
+    """
+    Check content against Google Scholar for academic source matching.
+    Returns list of potential academic source matches.
+    """
+    import urllib.request
+    import urllib.parse
+    
+    results = []
+    query_clean = " ".join(query.split()[:12])
+    
+    try:
+        encoded_query = urllib.parse.quote_plus(query_clean)
+        url = f"https://scholar.google.com/scholar?q={encoded_query}&hl=en"
+        
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+        }
+        
+        req = urllib.request.Request(url, headers=headers)
+        
+        with urllib.request.urlopen(req, timeout=10) as response:
+            html = response.read().decode('utf-8', errors='ignore')
+            
+            import re
+            
+            # Extract titles and links from Scholar results
+            title_pattern = r'<h3[^>]*class="gs_rt"[^>]*>.*?<a[^>]*href="([^"]*)"[^>]*>([^<]*(?:<[^/][^>]*>[^<]*</[^>]*>)*[^<]*)</a>'
+            matches = re.findall(title_pattern, html, re.DOTALL)
+            
+            for url_match, title in matches[:3]:
+                clean_title = re.sub(r'<[^>]+>', '', title).strip()
+                results.append({
+                    "url": url_match,
+                    "title": clean_title,
+                    "source": "google_scholar"
+                })
+                
+    except Exception as exc:
+        _debug("scholar_search.error", str(exc))
+    
+    return results
+
+
+def _calculate_text_similarity(text1: str, text2: str) -> float:
+    """
+    Calculate semantic similarity between two texts using multiple methods.
+    Returns similarity score 0-1.
+    """
+    if not text1 or not text2:
+        return 0.0
+    
+    # Method 1: Word overlap (Jaccard)
+    words1 = set(_tokenize_text(text1.lower()))
+    words2 = set(_tokenize_text(text2.lower()))
+    
+    if not words1 or not words2:
+        return 0.0
+    
+    jaccard = len(words1 & words2) / len(words1 | words2)
+    
+    # Method 2: N-gram overlap
+    shingles1 = _create_shingles(list(words1), 3)
+    shingles2 = _create_shingles(list(words2), 3)
+    
+    shingle_sim = _jaccard_similarity(shingles1, shingles2)
+    
+    # Method 3: Sequence matching
+    from difflib import SequenceMatcher
+    seq_sim = SequenceMatcher(None, text1.lower()[:500], text2.lower()[:500]).ratio()
+    
+    # Weighted average
+    return (jaccard * 0.3 + shingle_sim * 0.4 + seq_sim * 0.3)
+
+
+def _extract_key_sentences(text: str, num_sentences: int = 10) -> list:
+    """
+    Extract the most distinctive sentences for plagiarism checking.
+    Prioritizes sentences with specific claims, numbers, or unique phrasing.
+    """
+    import re
+    
+    sentences = re.split(r'[.!?]+', text)
+    sentences = [s.strip() for s in sentences if len(s.strip()) > 40]
+    
+    scored_sentences = []
+    
+    for sent in sentences:
+        score = 0
+        
+        # Prefer sentences with numbers/statistics
+        if re.search(r'\d+(?:\.\d+)?%|\d{4}|\d+\s*(?:million|billion|thousand)', sent):
+            score += 3
+        
+        # Prefer sentences with specific claims
+        claim_words = ['discovered', 'found', 'proved', 'demonstrated', 'showed', 
+                       'revealed', 'concluded', 'established', 'confirmed']
+        if any(word in sent.lower() for word in claim_words):
+            score += 2
+        
+        # Prefer sentences with proper nouns (likely specific references)
+        proper_nouns = re.findall(r'\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\b', sent)
+        score += min(len(proper_nouns), 3)
+        
+        # Prefer longer, more specific sentences
+        word_count = len(sent.split())
+        if 15 <= word_count <= 40:
+            score += 2
+        elif word_count > 40:
+            score += 1
+        
+        # Penalize very common sentence starters
+        common_starters = ['this is', 'it is', 'there are', 'we can', 'the']
+        if any(sent.lower().startswith(starter) for starter in common_starters):
+            score -= 1
+        
+        scored_sentences.append((sent, score))
+    
+    # Sort by score and return top sentences
+    scored_sentences.sort(key=lambda x: x[1], reverse=True)
+    return [s[0] for s in scored_sentences[:num_sentences]]
+
+
+def _check_sentence_against_web(sentence: str) -> dict:
+    """
+    Check a single sentence against web sources.
+    Returns match information if found.
+    """
+    web_results = _web_search_check(sentence, num_results=3)
+    scholar_results = _google_scholar_check(sentence)
+    
+    all_results = web_results + scholar_results
+    
+    matches = []
+    for result in all_results:
+        snippet = result.get("snippet", "").lower()
+        
+        # Calculate how similar the snippet is to our sentence
+        if snippet:
+            similarity = _calculate_text_similarity(sentence, snippet)
+            
+            if similarity > 0.4:  # Threshold for potential match
+                matches.append({
+                    "url": result.get("url", ""),
+                    "title": result.get("title", ""),
+                    "source": result.get("source", "web"),
+                    "similarity": round(similarity * 100, 1),
+                    "snippet": snippet[:200]
+                })
+    
+    return {
+        "sentence": sentence[:100] + "..." if len(sentence) > 100 else sentence,
+        "matches": sorted(matches, key=lambda x: x["similarity"], reverse=True)[:3],
+        "has_match": len(matches) > 0,
+        "highest_similarity": max([m["similarity"] for m in matches]) if matches else 0
+    }
+
+
+def _detect_paraphrasing(text: str) -> dict:
+    """
+    Detect potential paraphrasing by analyzing sentence structure patterns.
+    Paraphrased content often has unusual word choices or awkward phrasing.
+    """
+    import re
+    from collections import Counter
+    
+    sentences = re.split(r'[.!?]+', text)
+    sentences = [s.strip() for s in sentences if len(s.strip()) > 30]
+    
+    indicators = []
+    suspicious_count = 0
+    
+    for i, sent in enumerate(sentences):
+        words = sent.lower().split()
+        
+        # Check for overly complex synonyms (thesaurus abuse)
+        complex_words = [w for w in words if len(w) > 10]
+        complex_ratio = len(complex_words) / len(words) if words else 0
+        
+        # Check for passive voice overuse (common in paraphrasing)
+        passive_patterns = r'\b(is|are|was|were|been|being)\s+\w+ed\b'
+        passive_count = len(re.findall(passive_patterns, sent.lower()))
+        
+        # Check for unusual word order
+        # Sentences starting with adverbs or prepositional phrases
+        unusual_starts = r'^(However|Moreover|Furthermore|Additionally|Consequently|Nevertheless|Interestingly|Surprisingly|Remarkably)'
+        has_unusual_start = bool(re.match(unusual_starts, sent))
+        
+        # Check for synonym chains (multiple synonyms of same concept)
+        word_freq = Counter(words)
+        
+        suspicion_score = 0
+        reasons = []
+        
+        if complex_ratio > 0.2:
+            suspicion_score += 2
+            reasons.append("High density of complex words")
+        
+        if passive_count > 2:
+            suspicion_score += 1
+            reasons.append("Heavy passive voice usage")
+        
+        if has_unusual_start and i > 0:
+            suspicion_score += 0.5
+            reasons.append("Unusual sentence structure")
+        
+        if suspicion_score >= 2:
+            suspicious_count += 1
+            indicators.append({
+                "sentence_num": i + 1,
+                "text": sent[:80] + "..." if len(sent) > 80 else sent,
+                "suspicion_score": round(suspicion_score, 1),
+                "reasons": reasons
+            })
+    
+    paraphrase_percentage = (suspicious_count / len(sentences) * 100) if sentences else 0
+    
+    return {
+        "indicators": indicators[:10],
+        "suspicious_sentence_count": suspicious_count,
+        "total_sentences": len(sentences),
+        "paraphrase_percentage": round(paraphrase_percentage, 1),
+        "risk_level": "high" if paraphrase_percentage > 30 else ("medium" if paraphrase_percentage > 15 else "low")
+    }
+
+
+def _analyze_writing_patterns(text: str) -> dict:
+    """
+    Deep analysis of writing patterns to detect copied/patchwork content.
+    """
+    import re
+    from collections import Counter
+    
+    paragraphs = [p.strip() for p in text.split('\n\n') if len(p.strip()) > 50]
+    
+    if len(paragraphs) < 2:
+        return {
+            "pattern_consistency": 100,
+            "anomalies": [],
+            "assessment": "insufficient_text"
+        }
+    
+    paragraph_profiles = []
+    
+    for para in paragraphs:
+        sentences = re.split(r'[.!?]+', para)
+        sentences = [s.strip() for s in sentences if s.strip()]
+        
+        words = para.lower().split()
+        
+        # Calculate various metrics
+        profile = {
+            "avg_sentence_length": sum(len(s.split()) for s in sentences) / len(sentences) if sentences else 0,
+            "avg_word_length": sum(len(w) for w in words) / len(words) if words else 0,
+            "punctuation_density": len(re.findall(r'[,;:\-\(\)]', para)) / len(words) if words else 0,
+            "question_ratio": len([s for s in sentences if '?' in s]) / len(sentences) if sentences else 0,
+            "first_person_usage": len(re.findall(r'\b(I|we|my|our|us)\b', para, re.I)) / len(words) if words else 0,
+            "passive_voice_ratio": len(re.findall(r'\b(is|are|was|were|been|being)\s+\w+ed\b', para.lower())) / len(sentences) if sentences else 0,
+            "contraction_usage": len(re.findall(r"\b\w+'[a-z]+\b", para.lower())) / len(words) if words else 0,
+        }
+        paragraph_profiles.append(profile)
+    
+    # Detect anomalies (paragraphs that differ significantly from neighbors)
+    anomalies = []
+    
+    for i, profile in enumerate(paragraph_profiles):
+        if i == 0:
+            continue
+        
+        prev_profile = paragraph_profiles[i - 1]
+        
+        # Compare with previous paragraph
+        differences = []
+        
+        if abs(profile["avg_sentence_length"] - prev_profile["avg_sentence_length"]) > 10:
+            differences.append("sentence length")
+        if abs(profile["avg_word_length"] - prev_profile["avg_word_length"]) > 1.5:
+            differences.append("word complexity")
+        if abs(profile["punctuation_density"] - prev_profile["punctuation_density"]) > 0.05:
+            differences.append("punctuation style")
+        if abs(profile["first_person_usage"] - prev_profile["first_person_usage"]) > 0.03:
+            differences.append("narrative voice")
+        if abs(profile["passive_voice_ratio"] - prev_profile["passive_voice_ratio"]) > 0.3:
+            differences.append("voice (active/passive)")
+        
+        if len(differences) >= 2:
+            anomalies.append({
+                "paragraph": i + 1,
+                "differences": differences,
+                "severity": "high" if len(differences) >= 3 else "medium",
+                "text_preview": paragraphs[i][:100] + "..."
+            })
+    
+    # Calculate overall consistency
+    import statistics
+    
+    all_metrics = []
+    for metric_name in ["avg_sentence_length", "avg_word_length", "punctuation_density"]:
+        values = [p[metric_name] for p in paragraph_profiles]
+        if len(values) > 1:
+            cv = statistics.stdev(values) / statistics.mean(values) if statistics.mean(values) > 0 else 0
+            all_metrics.append(cv)
+    
+    avg_variation = sum(all_metrics) / len(all_metrics) if all_metrics else 0
+    pattern_consistency = max(0, 100 - avg_variation * 100)
+    
+    return {
+        "pattern_consistency": round(pattern_consistency, 1),
+        "anomalies": anomalies[:5],
+        "paragraph_count": len(paragraphs),
+        "assessment": "consistent" if pattern_consistency > 80 else ("moderate" if pattern_consistency > 60 else "inconsistent")
+    }
+
+
+def _ai_deep_analysis(text: str, preliminary_results: dict) -> dict:
+    """
+    Use AI for deep contextual plagiarism analysis.
+    Identifies suspicious patterns that algorithmic methods might miss.
+    """
+    api_key = _get_api_key()
+    gemini_key = _get_gemini_api_key()
+    
+    if not api_key and not gemini_key:
+        return {"ai_available": False}
+    
+    # Only run deep analysis if there are concerns
+    if preliminary_results.get("overall_score", 100) > 85:
+        return {
+            "ai_available": True,
+            "analysis_skipped": True,
+            "reason": "Preliminary score indicates low plagiarism risk"
+        }
+    
+    try:
+        system_prompt = """You are an expert academic integrity analyst. Analyze the text for signs of plagiarism, including:
+
+1. **Patchwork Plagiarism**: Content stitched from multiple sources
+2. **Paraphrasing Issues**: Poorly disguised copied content
+3. **Style Inconsistencies**: Sudden changes in writing quality/style
+4. **Citation Gaming**: Improper use of sources to mask copying
+5. **AI-Generated Content**: Signs of AI-written text
+
+Provide analysis in JSON format:
+{
+    "plagiarism_likelihood": 0-100 (0=original, 100=definitely plagiarized),
+    "confidence": 0-1,
+    "detected_issues": [
+        {
+            "type": "patchwork|paraphrase|style_shift|citation_gaming|ai_generated",
+            "severity": "low|medium|high|critical",
+            "description": "specific issue description",
+            "evidence": "quoted text showing the issue",
+            "location": "approximate location in text"
+        }
+    ],
+    "ai_content_probability": 0-100,
+    "overall_assessment": "brief 2-3 sentence summary",
+    "recommendations": ["action item 1", "action item 2", "action item 3"]
+}"""
+
+        user_prompt = f"""Analyze this academic text for plagiarism indicators:
+
+--- TEXT START ---
+{text[:4000]}
+--- TEXT END ---
+
+Preliminary Analysis Results:
+- Overall Score: {preliminary_results.get('overall_score', 'N/A')}/100
+- Risk Level: {preliminary_results.get('risk_level', 'unknown')}
+- Vocabulary Richness: {preliminary_results.get('component_scores', {}).get('vocabulary_richness', 'N/A')}%
+- Style Consistency: {preliminary_results.get('component_scores', {}).get('style_consistency', 'N/A')}%
+- Internal Duplicates: {preliminary_results.get('analyses', {}).get('internal_duplicates', {}).get('duplicate_percentage', 0)}%
+
+Perform deep analysis and identify specific plagiarism concerns."""
+
+        # Try Gemini first, then OpenAI
+        result = _invoke_gemini_text(system_prompt, user_prompt, temperature=0.2, max_output_tokens=1000)
+        
+        if not result:
+            result = _invoke_openai_text(system_prompt, user_prompt, temperature=0.2, max_output_tokens=1000)
+        
+        if not result:
+            return {"ai_available": True, "error": "AI analysis failed"}
+        
+        # Parse JSON response
+        import json
+        
+        raw = result.strip()
+        if "```json" in raw:
+            raw = raw.split("```json")[1].split("```")[0].strip()
+        elif "```" in raw:
+            raw = raw.split("```")[1].split("```")[0].strip()
+        
+        ai_result = json.loads(raw)
+        ai_result["ai_available"] = True
+        ai_result["analysis_completed"] = True
+        
+        return ai_result
+        
+    except Exception as exc:
+        _debug("ai_deep_analysis.error", str(exc))
+        return {"ai_available": True, "error": str(exc)}
+
 
 def _tokenize_text(text: str) -> list:
     """Tokenize text into words, removing punctuation and converting to lowercase."""
@@ -2982,7 +3445,6 @@ def analyze_plagiarism(text: str, filename: str = "") -> dict:
     vocabulary = _analyze_vocabulary_richness(text)
     common_phrases = _detect_common_phrases(text)
     style = _analyze_style_consistency(text)
-    citations = _analyze_citation_patterns(text)
     fingerprint = _calculate_text_fingerprint(text)
     
     # Calculate component scores (higher = more original, lower = more suspicious)
@@ -2999,27 +3461,19 @@ def analyze_plagiarism(text: str, filename: str = "") -> dict:
     # Style score: consistency is good
     style_score = style["consistency_score"]
     
-    # Citation score: proper citations boost originality confidence
-    citation_boost = min(20, citations["citation_density"] * 5)
-    citation_penalty = 10 if citations["mixed_styles"] else 0
-    citation_score = 70 + citation_boost - citation_penalty - len(citations["uncited_quotes"]) * 5
-    citation_score = max(0, min(100, citation_score))
-    
-    # Calculate weighted overall score
+    # Calculate weighted overall score (without citations)
     weights = {
-        "duplicates": 0.30,
-        "vocabulary": 0.20,
+        "duplicates": 0.35,
+        "vocabulary": 0.25,
         "phrases": 0.15,
-        "style": 0.20,
-        "citations": 0.15
+        "style": 0.25
     }
     
     overall_score = (
         duplicate_score * weights["duplicates"] +
         vocab_score * weights["vocabulary"] +
         phrase_score * weights["phrases"] +
-        style_score * weights["style"] +
-        citation_score * weights["citations"]
+        style_score * weights["style"]
     )
     
     # Determine risk level
@@ -3067,23 +3521,143 @@ def analyze_plagiarism(text: str, filename: str = "") -> dict:
             "message": "Writing style varies significantly across sections"
         })
     
-    if citations["uncited_quotes"]:
+    # ============ ENHANCED ANALYSIS (NEW) ============
+    
+    # Paraphrasing detection
+    paraphrasing = _detect_paraphrasing(text)
+    
+    # Writing pattern analysis
+    writing_patterns = _analyze_writing_patterns(text)
+    
+    # Web search check (sample key sentences)
+    web_matches = []
+    key_sentences = _extract_key_sentences(text, num_sentences=5)
+    
+    for sent in key_sentences[:3]:  # Check top 3 most distinctive sentences
+        match_result = _check_sentence_against_web(sent)
+        if match_result["has_match"]:
+            web_matches.append(match_result)
+    
+    # Calculate additional scores
+    paraphrase_score = max(0, 100 - paraphrasing["paraphrase_percentage"] * 2)
+    pattern_score = writing_patterns["pattern_consistency"]
+    web_match_score = 100 - (len(web_matches) * 15)  # -15 for each web match
+    web_match_score = max(0, min(100, web_match_score))
+    
+    # Update weights for enhanced scoring (without citations)
+    enhanced_weights = {
+        "duplicates": 0.22,
+        "vocabulary": 0.18,
+        "phrases": 0.12,
+        "style": 0.18,
+        "paraphrasing": 0.12,
+        "patterns": 0.10,
+        "web_matches": 0.08
+    }
+    
+    enhanced_score = (
+        duplicate_score * enhanced_weights["duplicates"] +
+        vocab_score * enhanced_weights["vocabulary"] +
+        phrase_score * enhanced_weights["phrases"] +
+        style_score * enhanced_weights["style"] +
+        paraphrase_score * enhanced_weights["paraphrasing"] +
+        pattern_score * enhanced_weights["patterns"] +
+        web_match_score * enhanced_weights["web_matches"]
+    )
+    
+    # Use enhanced score as the primary score
+    overall_score = enhanced_score
+    
+    # Update risk level with enhanced analysis
+    if overall_score >= 85:
+        risk_level = "low"
+        risk_description = "Document appears to be largely original with high confidence"
+    elif overall_score >= 70:
+        risk_level = "moderate"
+        risk_description = "Some areas may need review; minor concerns detected"
+    elif overall_score >= 50:
+        risk_level = "elevated"
+        risk_description = "Multiple indicators suggest potential plagiarism issues"
+    else:
+        risk_level = "high"
+        risk_description = "Significant plagiarism concerns detected - immediate review required"
+    
+    # Add enhanced issues
+    if paraphrasing["risk_level"] in ["medium", "high"]:
         issues.append({
-            "type": "uncited_content",
-            "severity": "medium",
-            "message": f"{len(citations['uncited_quotes'])} quoted passages without visible citations"
+            "type": "paraphrasing",
+            "severity": paraphrasing["risk_level"],
+            "message": f"Potential paraphrasing detected in {paraphrasing['paraphrase_percentage']}% of sentences"
         })
     
-    if citations["mixed_styles"]:
+    if writing_patterns["assessment"] == "inconsistent":
         issues.append({
-            "type": "citation_style",
-            "severity": "low",
-            "message": "Multiple citation styles detected"
+            "type": "writing_patterns",
+            "severity": "high",
+            "message": f"Writing patterns vary significantly across {len(writing_patterns['anomalies'])} sections"
         })
     
+    if web_matches:
+        issues.append({
+            "type": "web_matches",
+            "severity": "critical",
+            "message": f"{len(web_matches)} sentences found with potential web source matches"
+        })
+    
+    # Build preliminary results for AI analysis
+    preliminary_results = {
+        "overall_score": overall_score,
+        "risk_level": risk_level,
+        "component_scores": {
+            "vocabulary_richness": round(vocab_score, 1),
+            "style_consistency": round(style_score, 1),
+        },
+        "analyses": {
+            "internal_duplicates": internal_duplicates
+        }
+    }
+    
+    # Run AI deep analysis for suspicious documents
+    ai_analysis = {}
+    if overall_score < 80:
+        ai_analysis = _ai_deep_analysis(text, preliminary_results)
+        
+        # Incorporate AI findings
+        if ai_analysis.get("analysis_completed"):
+            ai_likelihood = ai_analysis.get("plagiarism_likelihood", 0)
+            
+            # Blend AI assessment with algorithmic score
+            if ai_likelihood > 50:
+                # Reduce score if AI detects high likelihood
+                overall_score = (overall_score * 0.6) + ((100 - ai_likelihood) * 0.4)
+                
+            # Add AI-detected issues
+            for ai_issue in ai_analysis.get("detected_issues", []):
+                if ai_issue.get("severity") in ["high", "critical"]:
+                    issues.append({
+                        "type": f"ai_{ai_issue.get('type', 'unknown')}",
+                        "severity": ai_issue.get("severity"),
+                        "message": ai_issue.get("description", "AI detected potential issue"),
+                        "evidence": ai_issue.get("evidence", "")[:100]
+                    })
+    
+    # Final risk level recalculation
+    if overall_score >= 85:
+        risk_level = "low"
+        risk_description = "Document appears to be original with high confidence"
+    elif overall_score >= 70:
+        risk_level = "moderate"
+        risk_description = "Some areas may need review"
+    elif overall_score >= 50:
+        risk_level = "elevated"
+        risk_description = "Multiple indicators suggest potential issues"
+    else:
+        risk_level = "high"
+        risk_description = "Significant concerns detected - requires thorough review"
+
     return {
         "overall_score": round(overall_score, 1),
-        "originality_score": round(overall_score, 1),  # Alias for clarity
+        "originality_score": round(overall_score, 1),
         "risk_level": risk_level,
         "risk_description": risk_description,
         "issues": issues,
@@ -3092,18 +3666,27 @@ def analyze_plagiarism(text: str, filename: str = "") -> dict:
             "vocabulary_richness": round(vocab_score, 1),
             "phrase_originality": round(phrase_score, 1),
             "style_consistency": round(style_score, 1),
-            "citation_quality": round(citation_score, 1)
+            "paraphrasing_check": round(paraphrase_score, 1),
+            "pattern_consistency": round(pattern_score, 1),
+            "web_source_check": round(web_match_score, 1)
         },
         "analyses": {
             "internal_duplicates": internal_duplicates,
             "vocabulary": vocabulary,
             "common_phrases": common_phrases,
             "style_consistency": style,
-            "citations": citations,
-            "fingerprint": fingerprint
+            "fingerprint": fingerprint,
+            "paraphrasing": paraphrasing,
+            "writing_patterns": writing_patterns,
+            "web_matches": web_matches,
+            "ai_analysis": ai_analysis if ai_analysis else None
         },
+        "web_sources_found": len(web_matches),
+        "ai_enhanced": bool(ai_analysis.get("analysis_completed")),
+        "ai_content_probability": ai_analysis.get("ai_content_probability", 0) if ai_analysis else 0,
         "word_count": len(text.split()),
-        "filename": filename
+        "filename": filename,
+        "analysis_version": "2.0-enhanced"
     }
 
 
