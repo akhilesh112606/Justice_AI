@@ -936,6 +936,675 @@
     .credibility-badge.high { background: rgba(16, 185, 129, 0.15); color: #10b981; }
     .credibility-badge.medium { background: rgba(251, 191, 36, 0.15); color: #fbbf24; }
     .credibility-badge.low { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
+
+    /* ==================== REWRITE-TO-ACCEPT SECTION ==================== */
+    .rewrite-section {
+      margin-top: 32px;
+      animation: fadeInUp 0.8s ease-out 0.6s forwards;
+      opacity: 0;
+    }
+
+    .rewrite-panel {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 20px;
+      backdrop-filter: blur(16px);
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.06) inset;
+      overflow: hidden;
+    }
+
+    .rewrite-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 20px 24px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      background: linear-gradient(135deg, rgba(168, 85, 247, 0.08), rgba(139, 92, 246, 0.04));
+      flex-wrap: wrap;
+      gap: 16px;
+    }
+
+    .rewrite-title {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 18px;
+      font-weight: 600;
+    }
+
+    .rewrite-title svg { width: 24px; height: 24px; color: #a855f7; }
+
+    .rewrite-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 16px;
+      background: linear-gradient(135deg, rgba(168, 85, 247, 0.2), rgba(139, 92, 246, 0.1));
+      border: 1px solid rgba(168, 85, 247, 0.3);
+      border-radius: 12px;
+      font-size: 12px;
+      font-weight: 600;
+      color: #a855f7;
+    }
+
+    .rewrite-badge svg { width: 16px; height: 16px; }
+
+    .rewrite-content { padding: 24px; }
+
+    /* Rewrite stats */
+    .rewrite-stats {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    @media (max-width: 768px) {
+      .rewrite-stats { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    .rewrite-stat {
+      padding: 16px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 14px;
+      text-align: center;
+    }
+
+    .rewrite-stat-icon {
+      width: 40px;
+      height: 40px;
+      margin: 0 auto 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 10px;
+    }
+
+    .rewrite-stat-icon.critical { background: rgba(239, 68, 68, 0.15); }
+    .rewrite-stat-icon.critical svg { color: #ef4444; }
+    .rewrite-stat-icon.high { background: rgba(249, 115, 22, 0.15); }
+    .rewrite-stat-icon.high svg { color: #f97316; }
+    .rewrite-stat-icon.medium { background: rgba(251, 191, 36, 0.15); }
+    .rewrite-stat-icon.medium svg { color: #fbbf24; }
+    .rewrite-stat-icon.ready { background: rgba(16, 185, 129, 0.15); }
+    .rewrite-stat-icon.ready svg { color: #10b981; }
+
+    .rewrite-stat-icon svg { width: 20px; height: 20px; }
+
+    .rewrite-stat-value { font-size: 28px; font-weight: 700; color: #ffffff; margin-bottom: 4px; }
+    .rewrite-stat-label { font-size: 11px; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.5px; }
+
+    /* Opportunity cards */
+    .rewrite-opportunities { max-height: 600px; overflow-y: auto; }
+
+    .opportunity-card {
+      padding: 18px;
+      margin-bottom: 14px;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 14px;
+      transition: all 0.3s ease;
+      cursor: pointer;
+    }
+
+    .opportunity-card:hover {
+      background: rgba(168, 85, 247, 0.05);
+      border-color: rgba(168, 85, 247, 0.3);
+      transform: translateY(-2px);
+    }
+
+    .opportunity-card.expanded {
+      background: rgba(168, 85, 247, 0.08);
+      border-color: rgba(168, 85, 247, 0.4);
+    }
+
+    .opportunity-header {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+    }
+
+    .opportunity-priority {
+      width: 36px;
+      height: 36px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .opportunity-priority.critical { background: rgba(239, 68, 68, 0.2); }
+    .opportunity-priority.critical svg { color: #ef4444; }
+    .opportunity-priority.high { background: rgba(249, 115, 22, 0.2); }
+    .opportunity-priority.high svg { color: #f97316; }
+    .opportunity-priority.medium { background: rgba(251, 191, 36, 0.2); }
+    .opportunity-priority.medium svg { color: #fbbf24; }
+    .opportunity-priority.low { background: rgba(138, 243, 255, 0.2); }
+    .opportunity-priority.low svg { color: #8af3ff; }
+
+    .opportunity-priority svg { width: 18px; height: 18px; }
+
+    .opportunity-main { flex: 1; min-width: 0; }
+
+    .opportunity-source {
+      display: inline-block;
+      padding: 3px 10px;
+      background: rgba(168, 85, 247, 0.15);
+      border-radius: 6px;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #a855f7;
+      margin-bottom: 6px;
+    }
+
+    .opportunity-title { font-size: 14px; font-weight: 600; color: #ffffff; margin-bottom: 4px; }
+    .opportunity-description { font-size: 13px; color: #9ca3af; line-height: 1.4; }
+    .opportunity-location { font-size: 11px; color: #6b7280; margin-top: 6px; }
+
+    .opportunity-expand {
+      width: 28px;
+      height: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.05);
+      flex-shrink: 0;
+      transition: all 0.3s ease;
+    }
+
+    .opportunity-expand svg { width: 14px; height: 14px; color: #9ca3af; transition: transform 0.3s ease; }
+    .opportunity-card.expanded .opportunity-expand svg { transform: rotate(180deg); }
+
+    /* Rewrite details (expanded state) */
+    .rewrite-details {
+      display: none;
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .opportunity-card.expanded .rewrite-details { display: block; }
+
+    .rewrite-comparison {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+
+    @media (max-width: 768px) {
+      .rewrite-comparison { grid-template-columns: 1fr; }
+    }
+
+    .rewrite-original, .rewrite-improved {
+      padding: 14px;
+      border-radius: 12px;
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    .rewrite-original {
+      background: rgba(239, 68, 68, 0.08);
+      border: 1px solid rgba(239, 68, 68, 0.2);
+    }
+
+    .rewrite-improved {
+      background: rgba(16, 185, 129, 0.08);
+      border: 1px solid rgba(16, 185, 129, 0.2);
+    }
+
+    .rewrite-label {
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .rewrite-original .rewrite-label { color: #ef4444; }
+    .rewrite-improved .rewrite-label { color: #10b981; }
+
+    .rewrite-text { color: #d1d5db; }
+
+    .rewrite-loading {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      padding: 30px;
+      color: #a855f7;
+      font-size: 14px;
+    }
+
+    .rewrite-loading-spinner {
+      width: 24px;
+      height: 24px;
+      border: 3px solid rgba(168, 85, 247, 0.2);
+      border-top-color: #a855f7;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    .rewrite-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .rewrite-btn {
+      padding: 10px 18px;
+      border-radius: 10px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: all 0.3s ease;
+    }
+
+    .rewrite-btn svg { width: 16px; height: 16px; }
+
+    .rewrite-btn-primary {
+      background: linear-gradient(135deg, #a855f7, #8b5cf6);
+      color: #ffffff;
+    }
+
+    .rewrite-btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(168, 85, 247, 0.3); }
+
+    .rewrite-btn-secondary {
+      background: rgba(255, 255, 255, 0.05);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      color: #ffffff;
+    }
+
+    .rewrite-btn-secondary:hover { background: rgba(255, 255, 255, 0.1); border-color: rgba(255, 255, 255, 0.25); }
+
+    .rewrite-btn-success {
+      background: rgba(16, 185, 129, 0.15);
+      border: 1px solid rgba(16, 185, 129, 0.3);
+      color: #10b981;
+    }
+
+    .rewrite-btn-success:hover { background: rgba(16, 185, 129, 0.25); }
+
+    /* Changes list */
+    .changes-list {
+      margin-top: 12px;
+      padding: 12px;
+      background: rgba(168, 85, 247, 0.06);
+      border-radius: 10px;
+    }
+
+    .changes-list-title { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #a855f7; margin-bottom: 8px; }
+    .changes-list ul { list-style: none; }
+    .changes-list li {
+      padding: 6px 0 6px 18px;
+      position: relative;
+      font-size: 12px;
+      color: #9ca3af;
+    }
+    .changes-list li::before { content: '✓'; position: absolute; left: 0; color: #10b981; }
+
+    /* Section rewrite cards */
+    .section-rewrites {
+      margin-top: 24px;
+      padding-top: 24px;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .section-rewrites-title {
+      font-size: 16px;
+      font-weight: 600;
+      color: #a855f7;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .section-rewrites-title svg { width: 20px; height: 20px; }
+
+    .section-card {
+      padding: 16px;
+      margin-bottom: 12px;
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+    }
+
+    .section-card:hover { background: rgba(255, 255, 255, 0.04); }
+
+    .section-info { flex: 1; }
+    .section-name { font-size: 14px; font-weight: 600; color: #ffffff; text-transform: capitalize; margin-bottom: 4px; }
+    .section-preview { font-size: 12px; color: #6b7280; }
+
+    /* ==================== ANALYSIS TABS (Top-level) ==================== */
+    .analysis-tabs-container {
+      margin-top: 32px;
+      animation: fadeInUp 0.8s ease-out 0.3s forwards;
+      opacity: 0;
+    }
+
+    .analysis-tabs-nav {
+      display: flex;
+      gap: 8px;
+      padding: 6px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 16px;
+      margin-bottom: 24px;
+      overflow-x: auto;
+    }
+
+    .analysis-tab-btn {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 14px 24px;
+      background: transparent;
+      border: none;
+      border-radius: 12px;
+      font-size: 14px;
+      font-weight: 600;
+      color: #9ca3af;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      white-space: nowrap;
+      position: relative;
+    }
+
+    .analysis-tab-btn svg {
+      width: 18px;
+      height: 18px;
+      opacity: 0.7;
+      transition: all 0.3s ease;
+    }
+
+    .analysis-tab-btn:hover {
+      color: #ffffff;
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .analysis-tab-btn:hover svg {
+      opacity: 1;
+    }
+
+    .analysis-tab-btn.active {
+      background: linear-gradient(135deg, rgba(138, 243, 255, 0.15), rgba(94, 210, 255, 0.08));
+      color: #8af3ff;
+      box-shadow: 0 0 20px rgba(138, 243, 255, 0.1);
+    }
+
+    .analysis-tab-btn.active svg {
+      opacity: 1;
+      color: #8af3ff;
+    }
+
+    .analysis-tab-btn.active.plagiarism-tab {
+      background: linear-gradient(135deg, rgba(16, 185, 129, 0.15), rgba(16, 185, 129, 0.08));
+      color: #10b981;
+    }
+
+    .analysis-tab-btn.active.plagiarism-tab svg {
+      color: #10b981;
+    }
+
+    .analysis-tab-btn.active.citation-tab {
+      background: linear-gradient(135deg, rgba(251, 191, 36, 0.15), rgba(251, 191, 36, 0.08));
+      color: #fbbf24;
+    }
+
+    .analysis-tab-btn.active.citation-tab svg {
+      color: #fbbf24;
+    }
+
+    .analysis-tab-btn.active.rewrite-tab {
+      background: linear-gradient(135deg, rgba(168, 85, 247, 0.15), rgba(168, 85, 247, 0.08));
+      color: #a855f7;
+    }
+
+    .analysis-tab-btn.active.rewrite-tab svg {
+      color: #a855f7;
+    }
+
+    .tab-badge {
+      font-size: 11px;
+      font-weight: 700;
+      padding: 3px 8px;
+      border-radius: 8px;
+      background: rgba(255, 255, 255, 0.1);
+      color: inherit;
+    }
+
+    .analysis-tab-btn.active .tab-badge {
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    .analysis-tab-content {
+      display: none;
+    }
+
+    .analysis-tab-content.active {
+      display: block;
+      animation: fadeInUp 0.4s ease-out forwards;
+    }
+
+    /* Hide individual section wrappers when inside tabs */
+    .analysis-tabs-container .plagiarism-section,
+    .analysis-tabs-container .citation-section,
+    .analysis-tabs-container .rewrite-section {
+      margin-top: 0;
+    }
+
+    @media (max-width: 768px) {
+      .analysis-tabs-nav {
+        flex-wrap: nowrap;
+        overflow-x: auto;
+        padding: 4px;
+      }
+
+      .analysis-tab-btn {
+        padding: 12px 16px;
+        font-size: 13px;
+      }
+
+      .analysis-tab-btn svg {
+        width: 16px;
+        height: 16px;
+      }
+    }
+
+    /* Modal Styles */
+    .rewrite-modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 10000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      opacity: 0;
+      visibility: hidden;
+      transition: all 0.3s ease;
+    }
+
+    .rewrite-modal.active {
+      opacity: 1;
+      visibility: visible;
+    }
+
+    .modal-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0, 0, 0, 0.85);
+      backdrop-filter: blur(8px);
+    }
+
+    .modal-container {
+      position: relative;
+      background: #0a0a0a;
+      border: 1px solid rgba(168, 85, 247, 0.3);
+      border-radius: 20px;
+      width: 90%;
+      max-width: 900px;
+      max-height: 85vh;
+      overflow: hidden;
+      box-shadow: 0 25px 50px rgba(168, 85, 247, 0.2), 0 0 100px rgba(168, 85, 247, 0.1);
+      transform: translateY(20px);
+      transition: transform 0.3s ease;
+    }
+
+    .rewrite-modal.active .modal-container {
+      transform: translateY(0);
+    }
+
+    .modal-header {
+      padding: 20px 24px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: linear-gradient(180deg, rgba(168, 85, 247, 0.1) 0%, transparent 100%);
+    }
+
+    .modal-title {
+      font-size: 18px;
+      font-weight: 700;
+      color: #a855f7;
+      margin: 0;
+    }
+
+    .modal-close {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      background: rgba(255, 255, 255, 0.05);
+      color: #9ca3af;
+      font-size: 24px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: all 0.2s ease;
+    }
+
+    .modal-close:hover {
+      background: rgba(239, 68, 68, 0.2);
+      border-color: rgba(239, 68, 68, 0.3);
+      color: #ef4444;
+    }
+
+    .modal-body {
+      padding: 24px;
+      max-height: calc(85vh - 80px);
+      overflow-y: auto;
+    }
+
+    .modal-loading {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 20px;
+      padding: 60px 20px;
+      color: #9ca3af;
+    }
+
+    .loading-spinner-large {
+      width: 48px;
+      height: 48px;
+      border: 3px solid rgba(168, 85, 247, 0.2);
+      border-top-color: #a855f7;
+      border-radius: 50%;
+      animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .highlight-phrase {
+      background: rgba(168, 85, 247, 0.2);
+      color: #c084fc;
+      padding: 1px 4px;
+      border-radius: 3px;
+    }
+
+    .rewrite-error {
+      text-align: center;
+      padding: 20px;
+      color: #ef4444;
+    }
+
+    .rewrite-error .error-icon {
+      font-size: 24px;
+      margin-right: 8px;
+    }
+
+    .loading-spinner {
+      width: 14px;
+      height: 14px;
+      border: 2px solid rgba(255, 255, 255, 0.3);
+      border-top-color: #ffffff;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+      display: inline-block;
+      margin-right: 6px;
+    }
+
+    .rewrite-btn.copied, .rewrite-btn.applied {
+      background: rgba(16, 185, 129, 0.2) !important;
+      border-color: rgba(16, 185, 129, 0.4) !important;
+      color: #10b981 !important;
+    }
+
+    .opportunity-card.rewrite-applied {
+      opacity: 0.7;
+      border-color: rgba(16, 185, 129, 0.3);
+    }
+
+    .opportunity-card.rewrite-applied::after {
+      content: '✓ Applied';
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      background: rgba(16, 185, 129, 0.2);
+      color: #10b981;
+      padding: 4px 10px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(10px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
   </style>
 </head>
 <body>
@@ -1232,15 +1901,55 @@
         </div>
       </div>
 
-      <!-- Plagiarism Analysis Section -->
-      {% if plagiarism_data %}
-      <div class="plagiarism-section">
-        <div class="plagiarism-panel">
-          <div class="plagiarism-header">
-            <div class="plagiarism-title">
-              <svg viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"></path><rect x="9" y="3" width="6" height="4" rx="1"></rect><path d="M9 12h6"></path><path d="M9 16h6"></path></svg>
-              Plagiarism Analysis
-            </div>
+      <!-- ==================== ANALYSIS TABS CONTAINER ==================== -->
+      {% if plagiarism_data or citation_data or (rewrite_data and rewrite_data.opportunities) %}
+      <div class="analysis-tabs-container">
+        <div class="analysis-tabs-nav" id="analysis-tabs-nav">
+          {% if plagiarism_data %}
+          <button class="analysis-tab-btn plagiarism-tab active" data-tab="plagiarism">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"></path>
+              <rect x="9" y="3" width="6" height="4" rx="1"></rect>
+              <path d="M9 12h6"></path><path d="M9 16h6"></path>
+            </svg>
+            Plagiarism
+            <span class="tab-badge">{{ plagiarism_data.overall_score | default(0) | round | int }}%</span>
+          </button>
+          {% endif %}
+          {% if citation_data %}
+          <button class="analysis-tab-btn citation-tab {% if not plagiarism_data %}active{% endif %}" data-tab="citation">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M6 2h9a2 2 0 0 1 2 2v2"></path>
+              <path d="M6 22h12a2 2 0 0 0 2-2V9.5L14.5 4H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2z"></path>
+              <polyline points="14 2 14 8 20 8"></polyline>
+              <path d="M12 18v-6"></path><path d="M9 15l3 3 3-3"></path>
+            </svg>
+            Citations
+            <span class="tab-badge">{{ citation_data.citation_score | default(0) | round | int }}</span>
+          </button>
+          {% endif %}
+          {% if rewrite_data and rewrite_data.opportunities %}
+          <button class="analysis-tab-btn rewrite-tab {% if not plagiarism_data and not citation_data %}active{% endif %}" data-tab="rewrite">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+            </svg>
+            Rewrite
+            <span class="tab-badge">{{ rewrite_data.stats.rewrite_ready_count | default(0) }}</span>
+          </button>
+          {% endif %}
+        </div>
+
+        <!-- Plagiarism Tab Content -->
+        {% if plagiarism_data %}
+        <div class="analysis-tab-content active" data-tab="plagiarism">
+          <div class="plagiarism-section">
+            <div class="plagiarism-panel">
+              <div class="plagiarism-header">
+                <div class="plagiarism-title">
+                  <svg viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"></path><rect x="9" y="3" width="6" height="4" rx="1"></rect><path d="M9 12h6"></path><path d="M9 16h6"></path></svg>
+                  Plagiarism Analysis
+                </div>
             <div class="score-circle-container">
               <div class="score-circle">
                 <svg viewBox="0 0 36 36">
@@ -1538,37 +2247,39 @@
           </div>
         </div>
       </div>
-      {% endif %}
+        </div>
+        {% endif %}
 
-      <!-- Citation Analysis Section -->
-      {% if citation_data %}
-      <div class="citation-section">
-        <div class="citation-panel">
-          <div class="citation-header">
-            <div class="citation-title">
-              <svg viewBox="0 0 24 24"><path d="M6 2h9a2 2 0 0 1 2 2v2"></path><path d="M6 22h12a2 2 0 0 0 2-2V9.5L14.5 4H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2z"></path><polyline points="14 2 14 8 20 8"></polyline><path d="M12 18v-6"></path><path d="M9 15l3 3 3-3"></path></svg>
-              Citation Analysis
-            </div>
-            <div class="citation-score-container">
-              <div class="citation-score-ring">
-                <svg viewBox="0 0 36 36">
-                  <circle class="citation-ring-bg" cx="18" cy="18" r="15"></circle>
-                  <circle class="citation-ring-progress {{ citation_data.risk_level | default('good') }}" 
-                          cx="18" cy="18" r="15"
-                          stroke-dasharray="{{ ((citation_data.citation_score | default(75)) / 100) * 94.2 }} 94.2"></circle>
-                </svg>
-                <span class="citation-score-text {{ citation_data.risk_level | default('good') }}">{{ citation_data.citation_score | default(75) }}</span>
-              </div>
-              <div class="citation-status">
-                <div class="citation-status-label">Citation Quality</div>
-                <div class="citation-status-value" style="color: {% if citation_data.risk_level == 'excellent' %}#10b981{% elif citation_data.risk_level == 'good' %}#8af3ff{% elif citation_data.risk_level == 'needs_improvement' %}#fbbf24{% else %}#ef4444{% endif %};">
-                  {{ citation_data.risk_level | default('good') | replace('_', ' ') | title }}
+        <!-- Citation Tab Content -->
+        {% if citation_data %}
+        <div class="analysis-tab-content {% if not plagiarism_data %}active{% endif %}" data-tab="citation">
+          <div class="citation-section">
+            <div class="citation-panel">
+              <div class="citation-header">
+                <div class="citation-title">
+                  <svg viewBox="0 0 24 24"><path d="M6 2h9a2 2 0 0 1 2 2v2"></path><path d="M6 22h12a2 2 0 0 0 2-2V9.5L14.5 4H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2z"></path><polyline points="14 2 14 8 20 8"></polyline><path d="M12 18v-6"></path><path d="M9 15l3 3 3-3"></path></svg>
+                  Citation Analysis
+                </div>
+                <div class="citation-score-container">
+                  <div class="citation-score-ring">
+                    <svg viewBox="0 0 36 36">
+                      <circle class="citation-ring-bg" cx="18" cy="18" r="15"></circle>
+                      <circle class="citation-ring-progress {{ citation_data.risk_level | default('good') }}" 
+                              cx="18" cy="18" r="15"
+                              stroke-dasharray="{{ ((citation_data.citation_score | default(75)) / 100) * 94.2 }} 94.2"></circle>
+                    </svg>
+                    <span class="citation-score-text {{ citation_data.risk_level | default('good') }}">{{ citation_data.citation_score | default(75) }}</span>
+                  </div>
+                  <div class="citation-status">
+                    <div class="citation-status-label">Citation Quality</div>
+                    <div class="citation-status-value" style="color: {% if citation_data.risk_level == 'excellent' %}#10b981{% elif citation_data.risk_level == 'good' %}#8af3ff{% elif citation_data.risk_level == 'needs_improvement' %}#fbbf24{% else %}#ef4444{% endif %};">
+                      {{ citation_data.risk_level | default('good') | replace('_', ' ') | title }}
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
-          </div>
 
-          <div class="citation-content">
+              <div class="citation-content">
             <!-- Stats Grid -->
             <div class="citation-stats-grid">
               <div class="citation-stat-card">
@@ -1791,7 +2502,168 @@
           </div>
         </div>
       </div>
+        </div>
+        {% endif %}
+
+        <!-- Rewrite Tab Content -->
+        {% if rewrite_data and rewrite_data.opportunities %}
+        <div class="analysis-tab-content {% if not plagiarism_data and not citation_data %}active{% endif %}" data-tab="rewrite">
+          <div class="rewrite-section">
+            <div class="rewrite-panel">
+              <div class="rewrite-header">
+                <div class="rewrite-title">
+                  <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                  Rewrite-to-Accept
+                </div>
+                <div class="rewrite-badge">
+                  <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                  {{ rewrite_data.stats.rewrite_ready_count | default(0) }} Ready to Rewrite
+                </div>
+              </div>
+
+              <div class="rewrite-content">
+                <!-- Stats Overview -->
+                <div class="rewrite-stats">
+                  <div class="rewrite-stat">
+                    <div class="rewrite-stat-icon critical">
+                      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                    </div>
+                    <div class="rewrite-stat-value">{{ rewrite_data.stats.critical_count | default(0) }}</div>
+                    <div class="rewrite-stat-label">Critical</div>
+                  </div>
+                  <div class="rewrite-stat">
+                    <div class="rewrite-stat-icon high">
+                      <svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path></svg>
+                    </div>
+                    <div class="rewrite-stat-value">{{ rewrite_data.stats.high_count | default(0) }}</div>
+                    <div class="rewrite-stat-label">High Priority</div>
+                  </div>
+                  <div class="rewrite-stat">
+                    <div class="rewrite-stat-icon medium">
+                  <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                </div>
+                <div class="rewrite-stat-value">{{ rewrite_data.stats.medium_count | default(0) }}</div>
+                <div class="rewrite-stat-label">Medium Priority</div>
+              </div>
+              <div class="rewrite-stat">
+                <div class="rewrite-stat-icon ready">
+                  <svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                </div>
+                <div class="rewrite-stat-value">{{ rewrite_data.stats.total_opportunities | default(0) }}</div>
+                <div class="rewrite-stat-label">Total Opportunities</div>
+              </div>
+            </div>
+
+            <!-- Opportunity Cards -->
+            <div class="rewrite-opportunities">
+              {% for opp in rewrite_data.opportunities[:15] %}
+              <div class="opportunity-card" 
+                   data-id="{{ opp.id }}"
+                   data-type="{{ opp.type }}"
+                   data-affected="{{ opp.affected_text | default('') }}"
+                   data-description="{{ opp.description | default('') }}"
+                   data-fix="{{ opp.suggested_fix | default('') }}"
+                   data-section="{{ opp.section_name | default('') }}"
+                   data-ready="{{ opp.rewrite_ready | default(false) | lower }}">
+                <div class="opportunity-header">
+                  <div class="opportunity-priority {{ opp.priority | default('medium') }}">
+                    {% if opp.priority == 'critical' %}
+                    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                    {% elif opp.priority == 'high' %}
+                    <svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path></svg>
+                    {% else %}
+                    <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                    {% endif %}
+                  </div>
+                  <div class="opportunity-main">
+                    <span class="opportunity-source">{{ opp.source | default('general') }}</span>
+                    <div class="opportunity-title">{{ opp.title }}</div>
+                    <div class="opportunity-description">{{ opp.description[:120] }}{% if opp.description|length > 120 %}...{% endif %}</div>
+                    <div class="opportunity-location">📍 {{ opp.location | default('Document') }}</div>
+                  </div>
+                  <div class="opportunity-expand">
+                    <svg viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                  </div>
+                </div>
+
+                <div class="rewrite-details">
+                  {% if opp.affected_text %}
+                  <div class="rewrite-comparison">
+                    <div class="rewrite-original">
+                      <div class="rewrite-label">
+                        <svg viewBox="0 0 24 24" style="width: 14px; height: 14px;"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                        Original Text
+                      </div>
+                      <div class="rewrite-text original-text">{{ opp.affected_text[:200] }}{% if opp.affected_text|length > 200 %}...{% endif %}</div>
+                    </div>
+                    <div class="rewrite-improved">
+                      <div class="rewrite-label">
+                        <svg viewBox="0 0 24 24" style="width: 14px; height: 14px;"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                        Improved Version
+                      </div>
+                      <div class="rewrite-text improved-text" id="rewrite-{{ opp.id }}">
+                        <em style="color: #6b7280;">Click "Generate Rewrite" to see the improved version</em>
+                      </div>
+                    </div>
+                  </div>
+                  {% endif %}
+
+                  <div class="rewrite-actions">
+                    <button class="rewrite-btn rewrite-btn-primary generate-rewrite-btn" data-id="{{ opp.id }}">
+                      <svg viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5z"></path><path d="M2 17l10 5 10-5"></path><path d="M2 12l10 5 10-5"></path></svg>
+                      Generate Rewrite
+                    </button>
+                    <button class="rewrite-btn rewrite-btn-secondary copy-rewrite-btn" data-id="{{ opp.id }}" style="display: none;">
+                      <svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                      Copy
+                    </button>
+                    <button class="rewrite-btn rewrite-btn-success apply-rewrite-btn" data-id="{{ opp.id }}" style="display: none;">
+                      <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                      Applied
+                    </button>
+                  </div>
+
+                  <div class="changes-list" id="changes-{{ opp.id }}" style="display: none;">
+                    <div class="changes-list-title">Changes Made</div>
+                    <ul class="changes-items"></ul>
+                  </div>
+                </div>
+              </div>
+              {% endfor %}
+            </div>
+
+            <!-- Section Quick Rewrites -->
+            {% if rewrite_data.sections %}
+            <div class="section-rewrites">
+              <div class="section-rewrites-title">
+                <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                Quick Section Rewrites
+              </div>
+              {% for section_name, section_preview in rewrite_data.sections.items() %}
+              {% if section_name not in ['preamble', 'references'] %}
+              <div class="section-card" data-section="{{ section_name }}">
+                <div class="section-info">
+                  <div class="section-name">{{ section_name | replace('_', ' ') }}</div>
+                  <div class="section-preview">{{ section_preview[:80] }}{% if section_preview|length > 80 %}...{% endif %}</div>
+                </div>
+                <button class="rewrite-btn rewrite-btn-primary section-rewrite-btn" data-section="{{ section_name }}">
+                  <svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path></svg>
+                  Improve
+                </button>
+              </div>
+              {% endif %}
+              {% endfor %}
+            </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+        </div>
+        {% endif %}
+
+      </div>
       {% endif %}
+      <!-- End of Analysis Tabs Container -->
 
       <div class="actions">
         <a href="/" class="btn btn-secondary">
@@ -1802,6 +2674,51 @@
           <svg viewBox="0 0 24 24" style="width: 18px; height: 18px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
           Download Text
         </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Section Rewrite Modal -->
+  <div class="rewrite-modal" id="section-rewrite-modal">
+    <div class="modal-overlay"></div>
+    <div class="modal-container">
+      <div class="modal-header">
+        <h3 class="modal-title" id="modal-section-title">Section Rewrite</h3>
+        <button class="modal-close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div id="modal-loading" class="modal-loading" style="display: flex;">
+          <div class="loading-spinner-large"></div>
+          <span>Generating improved version...</span>
+        </div>
+        <div id="modal-content-area" style="display: none;">
+          <div class="comparison-view" style="display: grid;">
+            <div class="comparison-column original">
+              <div class="comparison-header">Original</div>
+              <div class="comparison-content" id="modal-original-text"></div>
+            </div>
+            <div class="comparison-column improved">
+              <div class="comparison-header">
+                <svg viewBox="0 0 24 24"><path d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
+                AI Improved
+              </div>
+              <div class="comparison-content rewritten-text-content" id="modal-rewritten-text"></div>
+            </div>
+          </div>
+          <div class="changes-made">
+            <div class="changes-title">
+              <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+              Changes Made
+            </div>
+            <ul class="changes-list" id="modal-changes-list"></ul>
+          </div>
+          <div class="rewrite-action-btns" style="display: flex; margin-top: 20px;">
+            <button class="rewrite-btn rewrite-btn-secondary copy-rewrite-btn">
+              <svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              Copy to Clipboard
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -2220,6 +3137,38 @@
       }, 200);
     });
 
+    // ==========================================
+    // TOP-LEVEL ANALYSIS TABS SWITCHING
+    // ==========================================
+    const analysisTabBtns = document.querySelectorAll('.analysis-tab-btn');
+    const analysisTabContents = document.querySelectorAll('.analysis-tab-content');
+
+    analysisTabBtns.forEach(btn => {
+      btn.addEventListener('click', () => {
+        const tabName = btn.dataset.tab;
+        
+        // Update active tab button
+        analysisTabBtns.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        
+        // Show corresponding tab content
+        analysisTabContents.forEach(content => {
+          if (content.dataset.tab === tabName) {
+            content.classList.add('active');
+          } else {
+            content.classList.remove('active');
+          }
+        });
+
+        // Trigger any animations for the newly visible tab
+        if (tabName === 'plagiarism') {
+          animateScoreCircle();
+        } else if (tabName === 'citation') {
+          animateCitationRing();
+        }
+      });
+    });
+
     // Plagiarism Analysis Tab Switching
     const plagiarismTabs = document.querySelectorAll('#plagiarism-tabs .analysis-tab');
     const analysisPanels = document.querySelectorAll('.analysis-panel');
@@ -2243,17 +3192,23 @@
       });
     });
 
-    // Animate score circle on load
-    const scoreCircle = document.querySelector('.score-circle-progress');
-    if (scoreCircle) {
-      const finalOffset = scoreCircle.getAttribute('stroke-dashoffset');
-      scoreCircle.style.strokeDashoffset = '97.4';
-      
-      setTimeout(() => {
-        scoreCircle.style.transition = 'stroke-dashoffset 1.5s ease-out';
-        scoreCircle.style.strokeDashoffset = finalOffset;
-      }, 500);
+    // Animate score circle function
+    function animateScoreCircle() {
+      const scoreCircle = document.querySelector('.score-circle-progress');
+      if (scoreCircle) {
+        const finalOffset = scoreCircle.getAttribute('stroke-dashoffset');
+        scoreCircle.style.transition = 'none';
+        scoreCircle.style.strokeDashoffset = '97.4';
+        
+        setTimeout(() => {
+          scoreCircle.style.transition = 'stroke-dashoffset 1.5s ease-out';
+          scoreCircle.style.strokeDashoffset = finalOffset;
+        }, 100);
+      }
     }
+
+    // Animate score circle on load
+    animateScoreCircle();
 
     // Citation Analysis Tab Switching
     const citationTabs = document.querySelectorAll('#citation-tabs .citation-tab');
@@ -2278,16 +3233,308 @@
       });
     });
 
+    // Animate citation score ring function
+    function animateCitationRing() {
+      const citationScoreRing = document.querySelector('.citation-ring-progress');
+      if (citationScoreRing) {
+        const dashArray = citationScoreRing.getAttribute('stroke-dasharray');
+        citationScoreRing.style.transition = 'none';
+        citationScoreRing.style.strokeDasharray = '0 94.2';
+        
+        setTimeout(() => {
+          citationScoreRing.style.transition = 'stroke-dasharray 1.5s ease-out';
+          citationScoreRing.style.strokeDasharray = dashArray;
+        }, 100);
+      }
+    }
+
     // Animate citation score ring on load
-    const citationScoreRing = document.querySelector('.citation-ring-progress');
-    if (citationScoreRing) {
-      const dashArray = citationScoreRing.getAttribute('stroke-dasharray');
-      citationScoreRing.style.strokeDasharray = '0 94.2';
+    animateCitationRing();
+
+    // ==========================================
+    // REWRITE-TO-ACCEPT FUNCTIONALITY
+    // ==========================================
+
+    // Opportunity Card Expand/Collapse
+    document.querySelectorAll('.opportunity-card').forEach(card => {
+      const header = card.querySelector('.opportunity-header');
+      const expandIcon = card.querySelector('.expand-icon');
+      const details = card.querySelector('.opportunity-details');
       
-      setTimeout(() => {
-        citationScoreRing.style.transition = 'stroke-dasharray 1.5s ease-out';
-        citationScoreRing.style.strokeDasharray = dashArray;
-      }, 700);
+      if (header && details) {
+        header.addEventListener('click', () => {
+          const isExpanded = card.classList.contains('expanded');
+          
+          // Collapse all other cards
+          document.querySelectorAll('.opportunity-card.expanded').forEach(otherCard => {
+            if (otherCard !== card) {
+              otherCard.classList.remove('expanded');
+              const otherDetails = otherCard.querySelector('.opportunity-details');
+              if (otherDetails) {
+                otherDetails.style.maxHeight = '0';
+                otherDetails.style.padding = '0 20px';
+              }
+              const otherIcon = otherCard.querySelector('.expand-icon');
+              if (otherIcon) otherIcon.style.transform = 'rotate(0deg)';
+            }
+          });
+          
+          // Toggle current card
+          if (isExpanded) {
+            card.classList.remove('expanded');
+            details.style.maxHeight = '0';
+            details.style.padding = '0 20px';
+            if (expandIcon) expandIcon.style.transform = 'rotate(0deg)';
+          } else {
+            card.classList.add('expanded');
+            details.style.maxHeight = details.scrollHeight + 40 + 'px';
+            details.style.padding = '20px';
+            if (expandIcon) expandIcon.style.transform = 'rotate(180deg)';
+          }
+        });
+      }
+    });
+
+    // Generate Rewrite Button Handler
+    document.querySelectorAll('.generate-rewrite-btn').forEach(btn => {
+      btn.addEventListener('click', async (e) => {
+        e.stopPropagation();
+        
+        const card = btn.closest('.opportunity-card');
+        const oppType = btn.dataset.oppType;
+        const oppId = btn.dataset.oppId;
+        const originalText = btn.dataset.originalText;
+        const suggestionText = btn.dataset.suggestion;
+        
+        const rewriteContainer = card.querySelector(`#rewrite-${oppId}`);
+        const changesContainer = card.querySelector(`#changes-${oppId}`);
+        const comparisonView = card.querySelector('.comparison-view');
+        const actionBtns = card.querySelector('.rewrite-action-btns');
+        
+        // Show loading state
+        btn.disabled = true;
+        btn.innerHTML = '<span class="loading-spinner"></span> Generating...';
+        
+        try {
+          const response = await fetch('/generate-rewrite', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              type: oppType,
+              original_text: originalText,
+              suggestion: suggestionText,
+              full_text: `{{ extracted_text[:3000] | tojson | safe }}`.slice(1, -1)
+            })
+          });
+          
+          const data = await response.json();
+          
+          if (data.success) {
+            // Display rewritten text
+            if (rewriteContainer) {
+              rewriteContainer.innerHTML = formatRewrittenText(data.rewritten_text);
+            }
+            
+            // Display changes list
+            if (changesContainer && data.changes && data.changes.length > 0) {
+              changesContainer.innerHTML = data.changes.map(change => 
+                `<li><span class="change-icon">✎</span> ${escapeHtml(change)}</li>`
+              ).join('');
+            }
+            
+            // Show comparison view and action buttons
+            if (comparisonView) comparisonView.style.display = 'grid';
+            if (actionBtns) actionBtns.style.display = 'flex';
+            
+            // Update button
+            btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg> Regenerate';
+            btn.disabled = false;
+            
+            // Expand the card to show results
+            card.classList.add('expanded');
+            const details = card.querySelector('.opportunity-details');
+            if (details) {
+              details.style.maxHeight = details.scrollHeight + 100 + 'px';
+              details.style.padding = '20px';
+            }
+            
+          } else {
+            throw new Error(data.error || 'Failed to generate rewrite');
+          }
+          
+        } catch (error) {
+          console.error('Rewrite generation error:', error);
+          btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg> Retry';
+          btn.disabled = false;
+          
+          if (rewriteContainer) {
+            rewriteContainer.innerHTML = `<div class="rewrite-error">
+              <span class="error-icon">⚠</span>
+              Error generating rewrite. Please try again.
+            </div>`;
+          }
+        }
+      });
+    });
+
+    // Section Rewrite Button Handler
+    document.querySelectorAll('.section-rewrite-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const sectionType = btn.dataset.section;
+        const modal = document.getElementById('section-rewrite-modal');
+        const modalTitle = document.getElementById('modal-section-title');
+        const modalOriginal = document.getElementById('modal-original-text');
+        const modalRewritten = document.getElementById('modal-rewritten-text');
+        const modalChanges = document.getElementById('modal-changes-list');
+        const modalLoading = document.getElementById('modal-loading');
+        const modalContent = document.getElementById('modal-content-area');
+        
+        // Show modal
+        if (modal) {
+          modal.classList.add('active');
+          modalTitle.textContent = sectionType.charAt(0).toUpperCase() + sectionType.slice(1) + ' Section';
+          modalLoading.style.display = 'flex';
+          modalContent.style.display = 'none';
+        }
+        
+        try {
+          const response = await fetch('/generate-rewrite', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+              type: 'section',
+              section_type: sectionType,
+              full_text: `{{ extracted_text[:5000] | tojson | safe }}`.slice(1, -1)
+            })
+          });
+          
+          const data = await response.json();
+          
+          if (data.success) {
+            modalOriginal.textContent = data.original_text || 'Section not found in document.';
+            modalRewritten.innerHTML = formatRewrittenText(data.rewritten_text);
+            
+            if (data.changes && data.changes.length > 0) {
+              modalChanges.innerHTML = data.changes.map(change => 
+                `<li><span class="change-icon">✎</span> ${escapeHtml(change)}</li>`
+              ).join('');
+            } else {
+              modalChanges.innerHTML = '<li>No specific changes tracked.</li>';
+            }
+            
+            modalLoading.style.display = 'none';
+            modalContent.style.display = 'block';
+          } else {
+            throw new Error(data.error);
+          }
+          
+        } catch (error) {
+          console.error('Section rewrite error:', error);
+          modalLoading.innerHTML = `<div class="rewrite-error">
+            <span class="error-icon">⚠</span>
+            Error generating section rewrite. Please try again.
+          </div>`;
+        }
+      });
+    });
+
+    // Close Modal
+    document.querySelectorAll('.modal-close, .modal-overlay').forEach(el => {
+      el.addEventListener('click', () => {
+        document.querySelectorAll('.rewrite-modal').forEach(modal => {
+          modal.classList.remove('active');
+        });
+      });
+    });
+
+    // Copy Rewritten Text
+    document.querySelectorAll('.copy-rewrite-btn').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const card = btn.closest('.opportunity-card') || btn.closest('.modal-body');
+        const rewriteText = card.querySelector('.rewritten-text-content, #modal-rewritten-text');
+        
+        if (rewriteText) {
+          try {
+            await navigator.clipboard.writeText(rewriteText.textContent);
+            
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Copied!';
+            btn.classList.add('copied');
+            
+            setTimeout(() => {
+              btn.innerHTML = originalText;
+              btn.classList.remove('copied');
+            }, 2000);
+          } catch (error) {
+            console.error('Copy failed:', error);
+          }
+        }
+      });
+    });
+
+    // Apply Rewrite (placeholder - would need document editing capabilities)
+    document.querySelectorAll('.apply-rewrite-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const card = btn.closest('.opportunity-card');
+        
+        // Show applied confirmation
+        btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg> Applied';
+        btn.classList.add('applied');
+        
+        // Mark card as completed
+        card.classList.add('rewrite-applied');
+        
+        // Update stats
+        const appliedCount = document.querySelector('.rewrite-stat-value.applied-count');
+        if (appliedCount) {
+          appliedCount.textContent = parseInt(appliedCount.textContent) + 1;
+        }
+      });
+    });
+
+    // Helper function to format rewritten text with highlights
+    function formatRewrittenText(text) {
+      if (!text) return '<em>No rewrite generated.</em>';
+      
+      // Escape HTML first
+      let formatted = escapeHtml(text);
+      
+      // Highlight key improvements (text in quotes often indicates new phrasing)
+      formatted = formatted.replace(/"([^"]+)"/g, '<span class="highlight-phrase">"$1"</span>');
+      
+      // Preserve paragraphs
+      formatted = formatted.replace(/\n\n/g, '</p><p>');
+      formatted = formatted.replace(/\n/g, '<br>');
+      
+      return '<p>' + formatted + '</p>';
+    }
+
+    // Helper function to escape HTML
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    // Animate rewrite stats on scroll
+    const rewriteSection = document.querySelector('.rewrite-opportunities-section');
+    if (rewriteSection) {
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.querySelectorAll('.rewrite-stat-value').forEach((stat, index) => {
+              stat.style.animation = `fadeInUp 0.5s ease ${index * 0.1}s forwards`;
+            });
+            observer.unobserve(entry.target);
+          }
+        });
+      }, { threshold: 0.2 });
+      
+      observer.observe(rewriteSection);
     }
   </script>
 </body>

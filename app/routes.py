@@ -1108,6 +1108,15 @@ def upload():
     citation_data = analyze_citations(extracted_text, filename)
     _debug("upload.citation_score", citation_data.get("citation_score", 0))
 
+    # Analyze rewrite opportunities
+    rewrite_data = analyze_rewrite_opportunities(
+        extracted_text,
+        formatting_data=formatting_data,
+        plagiarism_data=plagiarism_data,
+        citation_data=citation_data
+    )
+    _debug("upload.rewrite_opportunities", rewrite_data.get("stats", {}).get("total_opportunities", 0))
+
     return render_template(
         "results.html",
         filename=filename,
@@ -1117,6 +1126,7 @@ def upload():
         formatting_data=formatting_data,
         plagiarism_data=plagiarism_data,
         citation_data=citation_data,
+        rewrite_data=rewrite_data,
         pdf_base64=pdf_base64,
         is_pdf=is_pdf,
     )
@@ -1282,6 +1292,52 @@ FIR Document Content:
     except Exception as exc:
         _debug("chat.error", str(exc))
         return jsonify({"reply": "I apologize, but I encountered an error processing your request. Please try again."}), 500
+
+
+@main.route("/generate-rewrite", methods=["POST"])
+def generate_rewrite():
+    """Generate a rewrite for a specific issue or section.
+    
+    Expects JSON with:
+    - type: 'targeted' | 'section' | 'contributions'
+    - For targeted: original_text, issue_type, issue_description, suggested_fix
+    - For section: section_name, section_text, feedback, full_context
+    - For contributions: text, current_contributions
+    """
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "No data provided"}), 400
+        
+        rewrite_type = data.get("type", "targeted")
+        
+        if rewrite_type == "targeted":
+            result = generate_targeted_rewrite(
+                original_text=data.get("original_text", ""),
+                issue_type=data.get("issue_type", "general"),
+                issue_description=data.get("issue_description", ""),
+                suggested_fix=data.get("suggested_fix", "")
+            )
+        elif rewrite_type == "section":
+            result = generate_section_rewrite(
+                section_name=data.get("section_name", "general"),
+                section_text=data.get("section_text", ""),
+                feedback=data.get("feedback", ""),
+                full_context=data.get("full_context", "")
+            )
+        elif rewrite_type == "contributions":
+            result = generate_contribution_bullets(
+                text=data.get("text", ""),
+                current_contributions=data.get("current_contributions", [])
+            )
+        else:
+            return jsonify({"error": f"Unknown rewrite type: {rewrite_type}"}), 400
+        
+        return jsonify(result)
+        
+    except Exception as exc:
+        _debug("generate_rewrite.error", str(exc))
+        return jsonify({"error": str(exc)}), 500
 
 
 @main.route("/analyze-audio", methods=["POST"])
@@ -3671,6 +3727,685 @@ def verify_reference(ref: dict) -> dict:
         verification["issues"].append("Authors not clearly specified")
     
     return verification
+
+
+# ============================================================================
+# REWRITE-TO-ACCEPT SYSTEM
+# ============================================================================
+
+def identify_paper_sections(text: str) -> dict:
+    """Identify and extract major sections from a research paper.
+    
+    Returns dict with section names mapped to their text content.
+    """
+    import re
+    
+    # Common academic paper section patterns (without inline flags - we use re.IGNORECASE)
+    section_patterns = [
+        (r'\babstract\b', 'abstract'),
+        (r'\bintroduction\b', 'introduction'),
+        (r'\bliterature\s*review\b', 'literature_review'),
+        (r'\brelated\s*work\b', 'related_work'),
+        (r'\bbackground\b', 'background'),
+        (r'\bmethodology\b|\bmethods?\b', 'methodology'),
+        (r'\bexperiment(?:s|al)?\b', 'experiments'),
+        (r'\bresults?\b', 'results'),
+        (r'\bdiscussion\b', 'discussion'),
+        (r'\bconclusions?\b', 'conclusion'),
+        (r'\bfuture\s*work\b', 'future_work'),
+        (r'\bcontributions?\b', 'contributions'),
+        (r'\blimitations?\b', 'limitations'),
+        (r'\breferences?\b|\bbibliography\b', 'references'),
+        (r'\backnowledg(?:e)?ments?\b', 'acknowledgments'),
+    ]
+    
+    sections = {}
+    lines = text.split('\n')
+    current_section = 'preamble'
+    current_content = []
+    
+    for line in lines:
+        stripped = line.strip()
+        
+        # Check if this line is a section header
+        is_header = False
+        for pattern, section_name in section_patterns:
+            if re.match(f'^\\s*\\d*\\.?\\s*{pattern}\\s*$', stripped, re.IGNORECASE) or \
+               (len(stripped) < 50 and re.search(pattern, stripped) and stripped.isupper()):
+                # Save previous section
+                if current_content:
+                    sections[current_section] = '\n'.join(current_content)
+                current_section = section_name
+                current_content = []
+                is_header = True
+                break
+        
+        if not is_header:
+            current_content.append(line)
+    
+    # Save last section
+    if current_content:
+        sections[current_section] = '\n'.join(current_content)
+    
+    # Special handling for abstract (often at the beginning)
+    if 'abstract' not in sections and 'preamble' in sections:
+        preamble = sections['preamble']
+        abstract_match = re.search(r'(?i)abstract[:\s]*(.+?)(?=\n\n|\bintroduction\b|$)', preamble, re.DOTALL)
+        if abstract_match:
+            sections['abstract'] = abstract_match.group(1).strip()
+    
+    return sections
+
+
+def generate_section_rewrite(section_name: str, section_text: str, feedback: str, full_context: str = "") -> dict:
+    """Generate a rewritten version of a section based on feedback.
+    
+    Args:
+        section_name: Name of the section (abstract, introduction, etc.)
+        section_text: Original section text
+        feedback: Specific feedback/suggestion to address
+        full_context: Full paper context for coherence
+    
+    Returns dict with original, rewrite, explanation, and improvements.
+    """
+    api_key = _get_api_key()
+    
+    if not api_key:
+        return {
+            "success": False,
+            "error": "API key not configured",
+            "original": section_text,
+            "rewrite": None
+        }
+    
+    client = OpenAI(api_key=api_key)
+    
+    # Section-specific prompts
+    section_prompts = {
+        'abstract': """You are an expert academic editor specializing in research paper abstracts.
+An abstract should:
+- State the problem/motivation (1-2 sentences)
+- Describe the approach/methodology (1-2 sentences)
+- Highlight key results/findings (1-2 sentences)
+- State the significance/implications (1 sentence)
+Keep it concise (150-300 words typically).""",
+
+        'introduction': """You are an expert academic editor specializing in introductions.
+A strong introduction should:
+- Hook the reader with problem significance
+- Establish context and background
+- Clearly state the research gap
+- Present the thesis/research questions
+- Outline the paper structure
+- Preview key contributions""",
+
+        'methodology': """You are an expert academic editor specializing in methodology sections.
+A good methodology should:
+- Clearly describe the research design
+- Explain data collection methods
+- Detail analysis procedures
+- Justify methodological choices
+- Address validity and reliability
+- Be reproducible by other researchers""",
+
+        'results': """You are an expert academic editor specializing in results sections.
+Results should:
+- Present findings objectively
+- Use clear data organization
+- Reference figures/tables appropriately
+- Highlight significant findings
+- Avoid interpretation (save for discussion)""",
+
+        'discussion': """You are an expert academic editor specializing in discussion sections.
+A strong discussion should:
+- Interpret key findings
+- Compare with existing literature
+- Address implications
+- Acknowledge limitations
+- Suggest future research directions""",
+
+        'conclusion': """You are an expert academic editor specializing in conclusions.
+A strong conclusion should:
+- Summarize main findings
+- Restate significance
+- Present practical implications
+- NOT introduce new information
+- End with impact statement""",
+
+        'contributions': """You are an expert academic editor specializing in contribution statements.
+Strong contributions should:
+- Be specific and measurable
+- Distinguish from prior work
+- Highlight novelty clearly
+- Be ordered by importance
+- Use action verbs"""
+    }
+    
+    base_prompt = section_prompts.get(section_name, """You are an expert academic editor.
+Improve the text for clarity, conciseness, and academic rigor.""")
+    
+    system_msg = f"""{base_prompt}
+
+Your task is to rewrite the given section to address the specific feedback while:
+1. Maintaining the author's core meaning and voice
+2. Improving clarity and academic tone
+3. Making it more compelling for reviewers
+4. Ensuring proper academic language
+
+Respond in JSON format:
+{{
+    "rewritten_text": "The improved section text",
+    "changes_made": ["list of specific improvements"],
+    "word_count_change": "increased/decreased/same",
+    "confidence": 0.0-1.0
+}}"""
+
+    user_msg = f"""Section: {section_name.upper()}
+
+FEEDBACK TO ADDRESS:
+{feedback}
+
+ORIGINAL TEXT:
+{section_text[:3000]}
+
+{f"PAPER CONTEXT (for coherence):{chr(10)}{full_context[:1500]}" if full_context else ""}
+
+Please provide a rewritten version that addresses the feedback while maintaining academic quality."""
+
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": system_msg},
+                {"role": "user", "content": user_msg}
+            ],
+            temperature=0.4,
+            max_tokens=2000,
+        )
+        
+        raw = response.choices[0].message.content.strip()
+        
+        # Parse JSON
+        if "```json" in raw:
+            raw = raw.split("```json")[1].split("```")[0].strip()
+        elif "```" in raw:
+            raw = raw.split("```")[1].split("```")[0].strip()
+        
+        import json
+        result = json.loads(raw)
+        
+        return {
+            "success": True,
+            "original": section_text,
+            "rewrite": result.get("rewritten_text", ""),
+            "changes_made": result.get("changes_made", []),
+            "word_count_change": result.get("word_count_change", "same"),
+            "confidence": result.get("confidence", 0.7),
+            "section": section_name
+        }
+        
+    except Exception as exc:
+        _debug("section_rewrite.error", str(exc))
+        return {
+            "success": False,
+            "error": str(exc),
+            "original": section_text,
+            "rewrite": None
+        }
+
+
+def generate_targeted_rewrite(original_text: str, issue_type: str, issue_description: str, suggested_fix: str = "") -> dict:
+    """Generate a targeted rewrite for a specific issue.
+    
+    Args:
+        original_text: The text that needs improvement
+        issue_type: Type of issue (grammar, clarity, structure, etc.)
+        issue_description: Description of the problem
+        suggested_fix: Optional suggested fix
+    
+    Returns dict with original, rewrite, and explanation.
+    """
+    api_key = _get_api_key()
+    
+    if not api_key:
+        # Provide rule-based fixes for common issues
+        return _rule_based_rewrite(original_text, issue_type, issue_description)
+    
+    client = OpenAI(api_key=api_key)
+    
+    issue_prompts = {
+        'clarity': "Focus on making the text clearer and easier to understand. Remove ambiguity.",
+        'grammar': "Fix grammatical errors while preserving meaning.",
+        'conciseness': "Make the text more concise. Remove redundancy and wordiness.",
+        'academic_tone': "Improve the academic tone. Make it more formal and scholarly.",
+        'structure': "Improve sentence and paragraph structure for better flow.",
+        'passive_voice': "Convert passive voice to active voice where appropriate.",
+        'hedging': "Adjust hedging language (too much or too little certainty).",
+        'citation': "Improve citation integration and referencing.",
+        'transition': "Add or improve transitional phrases for better coherence.",
+        'specificity': "Make claims more specific and concrete.",
+    }
+    
+    specific_guidance = issue_prompts.get(issue_type, "Improve the text based on the described issue.")
+    
+    system_msg = f"""You are an expert academic editor providing targeted rewrites.
+
+{specific_guidance}
+
+Rules:
+1. Keep the rewrite close to the original length (±20%)
+2. Preserve the author's intended meaning
+3. Maintain academic tone
+4. Make minimal but impactful changes
+
+Respond in JSON:
+{{
+    "rewritten_text": "improved text",
+    "explanation": "brief explanation of changes",
+    "improvement_score": 1-10
+}}"""
+
+    user_msg = f"""ISSUE TYPE: {issue_type}
+PROBLEM: {issue_description}
+{f"SUGGESTED FIX: {suggested_fix}" if suggested_fix else ""}
+
+ORIGINAL TEXT:
+{original_text[:1500]}
+
+Provide a rewritten version that addresses this specific issue."""
+
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": system_msg},
+                {"role": "user", "content": user_msg}
+            ],
+            temperature=0.3,
+            max_tokens=1000,
+        )
+        
+        raw = response.choices[0].message.content.strip()
+        
+        if "```json" in raw:
+            raw = raw.split("```json")[1].split("```")[0].strip()
+        elif "```" in raw:
+            raw = raw.split("```")[1].split("```")[0].strip()
+        
+        import json
+        result = json.loads(raw)
+        
+        return {
+            "success": True,
+            "original": original_text,
+            "rewrite": result.get("rewritten_text", ""),
+            "explanation": result.get("explanation", ""),
+            "improvement_score": result.get("improvement_score", 5),
+            "issue_type": issue_type
+        }
+        
+    except Exception as exc:
+        _debug("targeted_rewrite.error", str(exc))
+        return _rule_based_rewrite(original_text, issue_type, issue_description)
+
+
+def _rule_based_rewrite(original_text: str, issue_type: str, issue_description: str) -> dict:
+    """Provide rule-based rewrites when LLM is unavailable."""
+    import re
+    
+    rewrite = original_text
+    changes = []
+    
+    if issue_type == 'passive_voice':
+        # Simple passive to active conversion hints
+        passive_patterns = [
+            (r'\bwas\s+(\w+ed)\s+by\b', 'Consider: "[subject] \\1"'),
+            (r'\bwere\s+(\w+ed)\s+by\b', 'Consider: "[subjects] \\1"'),
+            (r'\bis\s+(\w+ed)\s+by\b', 'Consider: "[subject] \\1s"'),
+        ]
+        for pattern, suggestion in passive_patterns:
+            if re.search(pattern, original_text, re.IGNORECASE):
+                changes.append(f"Passive voice detected. {suggestion}")
+    
+    elif issue_type == 'conciseness':
+        # Remove common filler phrases
+        filler_phrases = [
+            (r'\bin order to\b', 'to'),
+            (r'\bdue to the fact that\b', 'because'),
+            (r'\bat this point in time\b', 'now'),
+            (r'\bin the event that\b', 'if'),
+            (r'\bit is important to note that\b', 'notably,'),
+            (r'\bthe fact that\b', 'that'),
+            (r'\ba large number of\b', 'many'),
+            (r'\bin spite of the fact that\b', 'although'),
+        ]
+        for pattern, replacement in filler_phrases:
+            if re.search(pattern, rewrite, re.IGNORECASE):
+                rewrite = re.sub(pattern, replacement, rewrite, flags=re.IGNORECASE)
+                changes.append(f"Replaced wordy phrase with '{replacement}'")
+    
+    elif issue_type == 'academic_tone':
+        # Improve academic tone
+        informal_phrases = [
+            (r'\bget\b', 'obtain'),
+            (r'\bgot\b', 'obtained'),
+            (r'\bshow\b', 'demonstrate'),
+            (r'\bfind out\b', 'determine'),
+            (r'\blook at\b', 'examine'),
+            (r'\ba lot of\b', 'numerous'),
+            (r'\bbig\b', 'significant'),
+            (r'\bbad\b', 'adverse'),
+            (r'\bgood\b', 'beneficial'),
+        ]
+        for pattern, replacement in informal_phrases:
+            if re.search(pattern, rewrite, re.IGNORECASE):
+                rewrite = re.sub(pattern, replacement, rewrite, flags=re.IGNORECASE)
+                changes.append(f"Improved formality: '{pattern[2:-2]}' → '{replacement}'")
+    
+    elif issue_type == 'hedging':
+        # Adjust hedging language
+        over_hedging = [
+            (r'\bseems to perhaps\b', 'may'),
+            (r'\bmight possibly\b', 'may'),
+            (r'\bcould potentially\b', 'could'),
+        ]
+        for pattern, replacement in over_hedging:
+            if re.search(pattern, rewrite, re.IGNORECASE):
+                rewrite = re.sub(pattern, replacement, rewrite, flags=re.IGNORECASE)
+                changes.append(f"Reduced over-hedging")
+    
+    return {
+        "success": True,
+        "original": original_text,
+        "rewrite": rewrite if changes else original_text,
+        "explanation": "; ".join(changes) if changes else "No automatic fixes available. Manual review recommended.",
+        "improvement_score": 5 if changes else 3,
+        "issue_type": issue_type,
+        "rule_based": True
+    }
+
+
+def generate_contribution_bullets(text: str, current_contributions: list = None) -> dict:
+    """Generate improved contribution bullets for a paper.
+    
+    Args:
+        text: Full paper text for context
+        current_contributions: Existing contribution statements if any
+    
+    Returns dict with suggested contribution bullets.
+    """
+    api_key = _get_api_key()
+    
+    if not api_key:
+        return {
+            "success": False,
+            "error": "API key not configured",
+            "contributions": []
+        }
+    
+    client = OpenAI(api_key=api_key)
+    
+    system_msg = """You are an expert academic editor specializing in framing research contributions.
+
+Strong contribution statements should:
+1. Start with action verbs (We propose, We introduce, We demonstrate, We develop)
+2. Be specific and measurable
+3. Clearly differentiate from prior work
+4. Highlight novelty and impact
+5. Be ordered by importance (most significant first)
+
+Respond in JSON:
+{
+    "contributions": [
+        {
+            "bullet": "The contribution statement",
+            "type": "methodological|theoretical|empirical|practical",
+            "novelty_level": "high|medium|low",
+            "explanation": "Why this is a contribution"
+        }
+    ],
+    "summary": "One sentence summary of the work's impact"
+}"""
+
+    current_text = ""
+    if current_contributions:
+        current_text = f"\n\nCURRENT CONTRIBUTIONS (to improve):\n" + "\n".join(f"- {c}" for c in current_contributions)
+
+    user_msg = f"""Based on the following paper content, generate 3-5 strong contribution statements that would impress reviewers.
+
+PAPER CONTENT:
+{text[:4000]}
+{current_text}
+
+Generate compelling, specific contribution bullets."""
+
+    try:
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": system_msg},
+                {"role": "user", "content": user_msg}
+            ],
+            temperature=0.5,
+            max_tokens=1200,
+        )
+        
+        raw = response.choices[0].message.content.strip()
+        
+        if "```json" in raw:
+            raw = raw.split("```json")[1].split("```")[0].strip()
+        elif "```" in raw:
+            raw = raw.split("```")[1].split("```")[0].strip()
+        
+        import json
+        result = json.loads(raw)
+        
+        return {
+            "success": True,
+            "contributions": result.get("contributions", []),
+            "summary": result.get("summary", ""),
+            "original_contributions": current_contributions
+        }
+        
+    except Exception as exc:
+        _debug("contribution_bullets.error", str(exc))
+        return {
+            "success": False,
+            "error": str(exc),
+            "contributions": []
+        }
+
+
+def analyze_rewrite_opportunities(text: str, formatting_data: dict = None, plagiarism_data: dict = None, citation_data: dict = None) -> dict:
+    """Analyze the document and identify all rewrite opportunities.
+    
+    Consolidates feedback from all analysis modules into actionable rewrites.
+    
+    Returns comprehensive rewrite plan.
+    """
+    import re
+    
+    sections = identify_paper_sections(text)
+    rewrite_opportunities = []
+    
+    # Priority levels: critical, high, medium, low
+    
+    # 1. Extract issues from formatting data
+    if formatting_data and formatting_data.get("pages"):
+        for page in formatting_data["pages"]:
+            for suggestion in page.get("suggestions", []):
+                opp = {
+                    "id": f"format_{len(rewrite_opportunities)}",
+                    "source": "formatting",
+                    "type": suggestion.get("type", "general"),
+                    "severity": suggestion.get("severity", "minor"),
+                    "priority": "high" if suggestion.get("severity") in ["critical", "major"] else "medium",
+                    "title": suggestion.get("title", "Formatting Issue"),
+                    "description": suggestion.get("description", ""),
+                    "affected_text": suggestion.get("affected_text", ""),
+                    "location": suggestion.get("location", f"Page {page.get('page_number', '?')}"),
+                    "suggested_fix": suggestion.get("fix", ""),
+                    "page": page.get("page_number", 1),
+                    "rewrite_ready": bool(suggestion.get("affected_text"))
+                }
+                rewrite_opportunities.append(opp)
+    
+    # 2. Extract issues from plagiarism data
+    if plagiarism_data:
+        # Style inconsistencies
+        if plagiarism_data.get("style_analysis", {}).get("inconsistencies"):
+            for inc in plagiarism_data["style_analysis"]["inconsistencies"][:5]:
+                opp = {
+                    "id": f"style_{len(rewrite_opportunities)}",
+                    "source": "plagiarism",
+                    "type": "style_consistency",
+                    "severity": "minor",
+                    "priority": "medium",
+                    "title": "Style Inconsistency",
+                    "description": inc,
+                    "affected_text": "",
+                    "location": "Throughout document",
+                    "suggested_fix": "Maintain consistent writing style",
+                    "rewrite_ready": False
+                }
+                rewrite_opportunities.append(opp)
+        
+        # Common phrases (potential plagiarism)
+        if plagiarism_data.get("common_phrases", {}).get("flagged_phrases"):
+            for phrase_info in plagiarism_data["common_phrases"]["flagged_phrases"][:5]:
+                phrase = phrase_info.get("phrase", "") if isinstance(phrase_info, dict) else str(phrase_info)
+                opp = {
+                    "id": f"phrase_{len(rewrite_opportunities)}",
+                    "source": "plagiarism",
+                    "type": "common_phrase",
+                    "severity": "major",
+                    "priority": "high",
+                    "title": "Common/Stock Phrase Detected",
+                    "description": f"This phrase may be too generic or commonly used: '{phrase[:50]}'",
+                    "affected_text": phrase[:100] if isinstance(phrase, str) else "",
+                    "location": "Document",
+                    "suggested_fix": "Rephrase in your own words",
+                    "rewrite_ready": True
+                }
+                rewrite_opportunities.append(opp)
+    
+    # 3. Extract issues from citation data
+    if citation_data:
+        # Unsupported claims
+        if citation_data.get("unsupported_claims"):
+            for claim in citation_data["unsupported_claims"][:5]:
+                claim_text = claim.get("claim", "") if isinstance(claim, dict) else str(claim)
+                opp = {
+                    "id": f"citation_{len(rewrite_opportunities)}",
+                    "source": "citation",
+                    "type": "unsupported_claim",
+                    "severity": "major",
+                    "priority": "high",
+                    "title": "Claim Needs Citation",
+                    "description": f"This claim may need a supporting citation",
+                    "affected_text": claim_text[:150],
+                    "location": claim.get("location", "Document") if isinstance(claim, dict) else "Document",
+                    "suggested_fix": "Add appropriate citation or rephrase as opinion",
+                    "rewrite_ready": True
+                }
+                rewrite_opportunities.append(opp)
+        
+        # Citation issues
+        if citation_data.get("issues"):
+            for issue in citation_data["issues"][:5]:
+                opp = {
+                    "id": f"citissue_{len(rewrite_opportunities)}",
+                    "source": "citation",
+                    "type": "citation_format",
+                    "severity": issue.get("severity", "minor"),
+                    "priority": "medium",
+                    "title": issue.get("title", "Citation Issue"),
+                    "description": issue.get("description", ""),
+                    "affected_text": "",
+                    "location": issue.get("location", "References"),
+                    "suggested_fix": issue.get("fix", "Review citation formatting"),
+                    "rewrite_ready": False
+                }
+                rewrite_opportunities.append(opp)
+    
+    # 4. Section-specific improvements
+    section_improvements = []
+    
+    if 'abstract' in sections:
+        abstract = sections['abstract']
+        word_count = len(abstract.split())
+        if word_count < 100:
+            section_improvements.append({
+                "section": "abstract",
+                "issue": "Abstract is too short",
+                "suggestion": "Expand to include motivation, method, results, and significance"
+            })
+        elif word_count > 350:
+            section_improvements.append({
+                "section": "abstract",
+                "issue": "Abstract is too long",
+                "suggestion": "Condense to 150-300 words"
+            })
+    
+    if 'introduction' in sections:
+        intro = sections['introduction']
+        # Check for research gap statement
+        if not re.search(r'(?i)(gap|lacking|missing|however|yet|but|limited)', intro):
+            section_improvements.append({
+                "section": "introduction",
+                "issue": "Research gap may not be clearly stated",
+                "suggestion": "Add explicit statement of what is missing in existing work"
+            })
+    
+    if 'conclusion' in sections:
+        conclusion = sections['conclusion']
+        if len(conclusion.split()) < 50:
+            section_improvements.append({
+                "section": "conclusion",
+                "issue": "Conclusion is too brief",
+                "suggestion": "Expand to summarize findings and discuss implications"
+            })
+    
+    # Convert section improvements to opportunities
+    for imp in section_improvements:
+        opp = {
+            "id": f"section_{len(rewrite_opportunities)}",
+            "source": "structure",
+            "type": "section_improvement",
+            "severity": "major",
+            "priority": "high",
+            "title": f"{imp['section'].title()}: {imp['issue']}",
+            "description": imp['suggestion'],
+            "affected_text": sections.get(imp['section'], "")[:200],
+            "location": imp['section'].title(),
+            "suggested_fix": imp['suggestion'],
+            "section_name": imp['section'],
+            "full_section_text": sections.get(imp['section'], ""),
+            "rewrite_ready": True
+        }
+        rewrite_opportunities.append(opp)
+    
+    # Sort by priority
+    priority_order = {"critical": 0, "high": 1, "medium": 2, "low": 3}
+    rewrite_opportunities.sort(key=lambda x: priority_order.get(x.get("priority", "low"), 3))
+    
+    # Calculate summary stats
+    stats = {
+        "total_opportunities": len(rewrite_opportunities),
+        "critical_count": sum(1 for o in rewrite_opportunities if o.get("priority") == "critical"),
+        "high_count": sum(1 for o in rewrite_opportunities if o.get("priority") == "high"),
+        "medium_count": sum(1 for o in rewrite_opportunities if o.get("priority") == "medium"),
+        "low_count": sum(1 for o in rewrite_opportunities if o.get("priority") == "low"),
+        "rewrite_ready_count": sum(1 for o in rewrite_opportunities if o.get("rewrite_ready")),
+        "sections_identified": list(sections.keys())
+    }
+    
+    return {
+        "opportunities": rewrite_opportunities[:20],  # Limit to top 20
+        "stats": stats,
+        "sections": {k: v[:500] for k, v in sections.items()},  # Truncate section previews
+        "full_sections": sections  # Keep full sections for rewriting
+    }
 
 
 def extract_text_from_pdf(pdf_path: str) -> str:
