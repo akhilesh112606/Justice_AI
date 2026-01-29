@@ -1247,40 +1247,50 @@ def match_image():
 
 @main.route("/chat", methods=["POST"])
 def chat():
-    """Handle chatbot messages and return AI-generated responses based on FIR context."""
+    """Handle chatbot messages and return AI-generated responses based on research paper context."""
     data = request.get_json() or {}
     user_message = (data.get("message") or "").strip()
-    fir_context = (data.get("context") or "").strip()
+    paper_context = (data.get("context") or "").strip()
 
     if not user_message:
         return jsonify({"reply": "Please enter a message."}), 400
 
-    system_prompt = """You are an AI Investigation Advisor assistant for law enforcement. You have analyzed an FIR (First Information Report) document and can answer questions about the case.
+    system_prompt = """You are an AI Research Paper Review Assistant named "ReviewerAI". You have access to the full analysis of a research paper including its text content, plagiarism analysis, citation analysis, formatting suggestions, and rewrite opportunities.
 
 Your role:
-- Provide helpful investigative insights and suggestions
-- Answer questions about the case details, characters, timeline, and locations
-- Suggest investigative approaches and next steps
-- Help identify potential leads or inconsistencies
-- Be professional, precise, and objective
+- Provide specific, actionable feedback on academic writing and paper structure
+- Answer questions about the paper's content, methodology, findings, and analysis results
+- Explain plagiarism findings in detail and suggest how to address them
+- Help improve citations, reference formatting, and academic integrity
+- Suggest concrete ways to strengthen arguments and improve clarity
+- Guide users through improving specific sections of their paper
+- Provide writing tips and academic best practices
 
 Important guidelines:
-- Only provide advisory information, not legal advice
-- Base your responses on the FIR content provided
-- If information is not available in the FIR, say so clearly
-- Be concise but thorough
-- Maintain confidentiality and professionalism
+- Always reference the specific analysis data provided when answering
+- Be specific - mention actual scores, issues, and suggestions from the analysis
+- Focus on constructive, actionable feedback with examples when possible
+- If the user asks about something not in the analysis, say so clearly
+- Be encouraging but honest about areas needing improvement
+- Prioritize high-impact improvements first
+- Use markdown formatting for clear, structured responses
 
-FIR Document Content:
+You have access to:
+- The paper's extracted text content
+- Plagiarism analysis with originality scores and issues
+- Citation analysis with reference quality metrics
+- Formatting suggestions for each page
+- Rewrite opportunities with priority levels
+
 """
 
     try:
-        prompt = f"{system_prompt}{fir_context}\n\nUser message:\n{user_message}"
+        prompt = f"{system_prompt}\n{paper_context}\n\n---\nUser Question: {user_message}\n\nProvide a helpful, specific response based on the paper analysis above:"
         reply = _invoke_chat_response(
             system_prompt,
             prompt,
             temperature=0.7,
-            max_output_tokens=500,
+            max_output_tokens=800,
         )
         if not reply:
             return jsonify({"reply": "AI service is not configured. Please contact the administrator."}), 500

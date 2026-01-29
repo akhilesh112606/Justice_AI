@@ -9,6 +9,12 @@
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Sora:wght@400;600;700&display=swap" rel="stylesheet">
   <!-- PDF.js -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <!-- Spline 3D Viewer -->
+  <script type="module" src="https://unpkg.com/@splinetool/viewer@1.12.27/build/spline-viewer.js"></script>
+  <!-- Marked.js for markdown parsing -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <!-- DOMPurify for sanitization -->
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.5/dist/purify.min.js"></script>
   <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
     html, body { width: 100%; min-height: 100%; font-family: 'Space Grotesk', 'Sora', system-ui, -apple-system, sans-serif; }
@@ -1605,6 +1611,257 @@
       }
     }
 
+    /* ==================== CHATBOT SECTION ==================== */
+    .chatbot-wrapper { 
+      margin: 48px 0 32px; 
+      animation: fadeInUp 0.8s ease-out 0.6s forwards; 
+      opacity: 0; 
+    }
+
+    .chatbot-section-header {
+      text-align: center;
+      margin-bottom: 20px;
+    }
+
+    .chatbot-pill {
+      display: inline-flex;
+      gap: 8px;
+      align-items: center;
+      padding: 10px 16px;
+      background: rgba(138, 243, 255, 0.08);
+      border: 1px solid rgba(138, 243, 255, 0.25);
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+      color: #8af3ff;
+      margin-bottom: 14px;
+    }
+
+    .chatbot-pill .status-dots {
+      display: flex;
+      gap: 4px;
+    }
+
+    .chatbot-pill .status-dots span {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #8af3ff;
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+
+    .chatbot-pill .status-dots span:nth-child(2) { animation-delay: 0.2s; }
+    .chatbot-pill .status-dots span:nth-child(3) { animation-delay: 0.4s; }
+
+    .chatbot-section-title {
+      font-size: clamp(24px, 4vw, 32px);
+      font-weight: 700;
+      letter-spacing: -0.2px;
+      margin-bottom: 8px;
+    }
+
+    .chatbot-section-sub {
+      color: #9ca3af;
+      font-size: 15px;
+    }
+
+    .chat-shell {
+      padding: 20px;
+      border-radius: 22px;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(16px);
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.06) inset;
+    }
+
+    .chatbot-container {
+      display: grid;
+      grid-template-columns: 1fr 1.2fr;
+      gap: 20px;
+      align-items: stretch;
+    }
+
+    @media (max-width: 900px) {
+      .chatbot-container { grid-template-columns: 1fr; }
+      .chat-panel { height: 480px; }
+    }
+
+    .chatbot-robot {
+      border-radius: 18px;
+      overflow: hidden;
+      background: radial-gradient(circle at 20% 20%, rgba(138, 243, 255, 0.12), transparent 55%), rgba(0, 0, 0, 0.25);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      min-height: 440px;
+      position: relative;
+      box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55);
+    }
+
+    .chatbot-robot spline-viewer {
+      width: 100%;
+      height: calc(100% + 50px);
+      min-height: 490px;
+      display: block;
+      position: relative;
+      top: 0;
+      margin-bottom: -50px;
+    }
+
+    .chat-panel {
+      display: flex;
+      flex-direction: column;
+      border-radius: 18px;
+      background: linear-gradient(135deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02));
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      backdrop-filter: blur(12px);
+      box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55), 0 0 0 1px rgba(255, 255, 255, 0.05) inset;
+      overflow: hidden;
+      min-height: 440px;
+      height: 500px;
+    }
+
+    .chat-messages {
+      flex: 1;
+      padding: 20px;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      max-height: 340px;
+    }
+
+    .chat-messages::-webkit-scrollbar { width: 6px; }
+    .chat-messages::-webkit-scrollbar-track { background: rgba(255, 255, 255, 0.05); border-radius: 3px; }
+    .chat-messages::-webkit-scrollbar-thumb { background: rgba(138, 243, 255, 0.3); border-radius: 3px; }
+
+    .chat-message {
+      padding: 14px 18px;
+      border-radius: 16px;
+      max-width: 88%;
+      animation: fadeInUp 0.3s ease;
+      box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
+      border: 1px solid rgba(255, 255, 255, 0.06);
+      text-align: left;
+    }
+
+    .chat-message.bot {
+      background: linear-gradient(135deg, rgba(138, 243, 255, 0.18), rgba(110, 212, 255, 0.1));
+      border-color: rgba(138, 243, 255, 0.3);
+      align-self: flex-start;
+    }
+
+    .chat-message.user {
+      background: rgba(255, 255, 255, 0.08);
+      border-color: rgba(255, 255, 255, 0.12);
+      align-self: flex-end;
+    }
+
+    .chat-message .sender {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: #8af3ff;
+      margin-bottom: 6px;
+      font-weight: 700;
+    }
+
+    .chat-message.user .sender { color: #9ca3af; }
+
+    .chat-message .text {
+      font-size: 14px;
+      line-height: 1.65;
+      color: #f0f8ff;
+      word-break: break-word;
+    }
+
+    .chat-message .text p { margin: 6px 0; }
+    .chat-message .text ul, .chat-message .text ol { margin: 8px 0 8px 0; padding-left: 20px; }
+    .chat-message .text li { margin: 4px 0; }
+    .chat-message .text code { background: rgba(0, 0, 0, 0.3); padding: 2px 6px; border-radius: 4px; font-size: 13px; color: #8af3ff; }
+    .chat-message .text strong { color: #ffffff; }
+
+    .chat-input-area {
+      display: flex;
+      gap: 12px;
+      padding: 16px 20px;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      background: rgba(0, 0, 0, 0.2);
+    }
+
+    .chat-input {
+      flex: 1;
+      padding: 14px 18px;
+      border-radius: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      background: rgba(0, 0, 0, 0.35);
+      color: #ffffff;
+      font-size: 14px;
+      font-family: 'Space Grotesk', system-ui, sans-serif;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .chat-input:focus {
+      border-color: rgba(138, 243, 255, 0.5);
+      box-shadow: 0 0 0 3px rgba(138, 243, 255, 0.15);
+    }
+
+    .chat-input::placeholder { color: #6b7280; }
+
+    .chat-send-btn {
+      padding: 14px 24px;
+      border-radius: 14px;
+      border: 1px solid rgba(138, 243, 255, 0.3);
+      background: linear-gradient(135deg, rgba(138, 243, 255, 0.2), rgba(94, 210, 255, 0.15));
+      color: #8af3ff;
+      font-weight: 700;
+      font-size: 14px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.3);
+    }
+
+    .chat-send-btn:hover {
+      background: linear-gradient(135deg, rgba(138, 243, 255, 0.3), rgba(94, 210, 255, 0.25));
+      border-color: rgba(138, 243, 255, 0.5);
+      transform: translateY(-2px);
+      box-shadow: 0 14px 30px rgba(138, 243, 255, 0.2);
+    }
+
+    .chat-send-btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+    .chat-disclaimer {
+      padding: 12px 20px;
+      font-size: 12px;
+      color: #9ca3af;
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
+      background: rgba(0, 0, 0, 0.15);
+    }
+
+    .chat-disclaimer strong { color: #fbbf24; }
+
+    .typing-indicator {
+      display: flex;
+      gap: 6px;
+      padding: 4px 0;
+    }
+
+    .typing-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #8af3ff;
+      animation: typingBounce 1.2s ease-in-out infinite;
+    }
+
+    .typing-dot:nth-child(2) { animation-delay: 0.15s; }
+    .typing-dot:nth-child(3) { animation-delay: 0.3s; }
+
+    @keyframes typingBounce {
+      0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+      30% { transform: translateY(-8px); opacity: 1; }
+    }
+
   </style>
 </head>
 <body>
@@ -2665,6 +2922,41 @@
       {% endif %}
       <!-- End of Analysis Tabs Container -->
 
+      <!-- Chatbot Section -->
+      <div class="chatbot-wrapper">
+        <div class="chatbot-section-header">
+          <div class="chatbot-pill">
+            <div class="status-dots"><span></span><span></span><span></span></div>
+            <span>AI Research Assistant</span>
+          </div>
+          <div class="chatbot-section-title">Paper-aware Chatbot</div>
+          <div class="chatbot-section-sub">Ask questions about your paper's analysis, get improvement suggestions, or clarify any findings.</div>
+        </div>
+
+        <div class="chat-shell">
+          <div class="chatbot-container">
+            <div class="chatbot-robot">
+              <spline-viewer url="https://prod.spline.design/oNMzWOQrsYUZkE-4/scene.splinecode"></spline-viewer>
+            </div>
+            <div class="chat-panel">
+              <div class="chat-messages" id="chat-messages">
+                <div class="chat-message bot">
+                  <div class="sender">AI Assistant</div>
+                  <div class="text">Hello! I'm your AI Research Assistant. I've analyzed your paper and I'm ready to help. Ask me about the plagiarism findings, citation issues, formatting suggestions, or how to improve specific sections of your paper.</div>
+                </div>
+              </div>
+              <div class="chat-input-area">
+                <input type="text" class="chat-input" id="chat-input" placeholder="Ask about your paper analysis..." autocomplete="off">
+                <button class="chat-send-btn" id="chat-send-btn">Send</button>
+              </div>
+              <div class="chat-disclaimer">
+                ⚠️ <strong>Note:</strong> AI suggestions are advisory only. Always verify recommendations and use your academic judgment.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div class="actions">
         <a href="/" class="btn btn-secondary">
           <svg viewBox="0 0 24 24" style="width: 18px; height: 18px;"><path d="M19 12H5"></path><polyline points="12 19 5 12 12 5"></polyline></svg>
@@ -3535,6 +3827,228 @@
       }, { threshold: 0.2 });
       
       observer.observe(rewriteSection);
+    }
+
+    // ==================== CHATBOT FUNCTIONALITY ====================
+    const chatMessages = document.getElementById('chat-messages');
+    const chatInput = document.getElementById('chat-input');
+    const chatSendBtn = document.getElementById('chat-send-btn');
+
+    // Render markdown content safely
+    function renderMarkdown(text) {
+      if (typeof marked !== 'undefined' && typeof DOMPurify !== 'undefined') {
+        const rawHtml = marked.parse(text);
+        return DOMPurify.sanitize(rawHtml);
+      }
+      return text.replace(/\n/g, '<br>');
+    }
+
+    // Add a message to the chat
+    function addMessage(content, isUser = false) {
+      const messageDiv = document.createElement('div');
+      messageDiv.className = `chat-message ${isUser ? 'user' : 'bot'}`;
+      
+      const senderDiv = document.createElement('div');
+      senderDiv.className = 'sender';
+      senderDiv.textContent = isUser ? 'You' : 'AI Assistant';
+      
+      const textDiv = document.createElement('div');
+      textDiv.className = 'text';
+      textDiv.innerHTML = isUser ? content : renderMarkdown(content);
+      
+      messageDiv.appendChild(senderDiv);
+      messageDiv.appendChild(textDiv);
+      chatMessages.appendChild(messageDiv);
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+
+    // Show typing indicator
+    function showTyping() {
+      const typingDiv = document.createElement('div');
+      typingDiv.className = 'chat-message bot';
+      typingDiv.id = 'typing-indicator';
+      typingDiv.innerHTML = `
+        <div class="sender">AI Assistant</div>
+        <div class="typing-indicator">
+          <div class="typing-dot"></div>
+          <div class="typing-dot"></div>
+          <div class="typing-dot"></div>
+        </div>
+      `;
+      chatMessages.appendChild(typingDiv);
+      chatMessages.scrollTop = chatMessages.scrollHeight;
+    }
+
+    // Remove typing indicator
+    function removeTyping() {
+      const typingIndicator = document.getElementById('typing-indicator');
+      if (typingIndicator) {
+        typingIndicator.remove();
+      }
+    }
+
+    // Get paper context from the analysis results
+    function getPaperContext() {
+      let context = "=== RESEARCH PAPER ANALYSIS CONTEXT ===\n\n";
+      
+      // Get filename and basic info
+      context += "--- Document Information ---\n";
+      context += `Filename: {{ filename }}\n`;
+      context += `Word Count: {{ word_count | default(0) }}\n`;
+      context += `Character Count: {{ char_count | default(0) }}\n`;
+      {% if formatting_data and formatting_data.score %}
+      context += `Formatting Score: {{ formatting_data.score }}/100\n`;
+      {% endif %}
+      context += "\n";
+      
+      // Get the full extracted text (up to 4000 chars for better context)
+      context += "--- Paper Content (Extracted Text) ---\n";
+      const fullText = {{ extracted_text | tojson }};
+      if (fullText) {
+        context += fullText.substring(0, 4000);
+        if (fullText.length > 4000) {
+          context += "\n[... content truncated for brevity ...]\n";
+        }
+      }
+      context += "\n\n";
+      
+      // Get plagiarism analysis details
+      {% if plagiarism_data %}
+      context += "--- Plagiarism Analysis Results ---\n";
+      context += `Overall Originality Score: {{ plagiarism_data.overall_score | default(0) | round(1) }}%\n`;
+      context += `Risk Level: {{ plagiarism_data.risk_level | default('unknown') }}\n`;
+      {% if plagiarism_data.component_scores %}
+      context += "Component Scores:\n";
+      context += `  - Duplicate Check: {{ plagiarism_data.component_scores.duplicate_check | default(0) }}%\n`;
+      context += `  - Vocabulary Richness: {{ plagiarism_data.component_scores.vocabulary_richness | default(0) }}%\n`;
+      context += `  - Phrase Originality: {{ plagiarism_data.component_scores.phrase_originality | default(0) }}%\n`;
+      context += `  - Style Consistency: {{ plagiarism_data.component_scores.style_consistency | default(0) }}%\n`;
+      context += `  - Citation Quality: {{ plagiarism_data.component_scores.citation_quality | default(0) }}%\n`;
+      {% endif %}
+      {% if plagiarism_data.issues %}
+      context += "Issues Found:\n";
+      {% for issue in plagiarism_data.issues[:5] %}
+      context += `  - {{ issue.title | default('Issue') }}: {{ issue.description | default('') }}\n`;
+      {% endfor %}
+      {% endif %}
+      context += "\n";
+      {% endif %}
+      
+      // Get citation analysis details
+      {% if citation_data %}
+      context += "--- Citation Analysis Results ---\n";
+      context += `Citation Score: {{ citation_data.citation_score | default(0) }}/100\n`;
+      context += `Total Citations: {{ citation_data.total_citations | default(0) }}\n`;
+      context += `Total References: {{ citation_data.total_references | default(0) }}\n`;
+      {% if citation_data.citation_density %}
+      context += `Citations per 1000 words: {{ citation_data.citation_density.citations_per_1000_words | default(0) }}\n`;
+      {% endif %}
+      {% if citation_data.issues %}
+      context += "Citation Issues:\n";
+      {% for issue in citation_data.issues[:5] %}
+      context += `  - [{{ issue.severity | default('info') | upper }}] {{ issue.title | default('Issue') }}: {{ issue.description | default('') }}\n`;
+      {% endfor %}
+      {% endif %}
+      {% if citation_data.unsupported_claims %}
+      context += "Unsupported Claims Found: {{ citation_data.unsupported_claims | length }}\n";
+      {% for claim in citation_data.unsupported_claims[:3] %}
+      context += `  - "{{ claim.text[:80] | default('') }}..."\n`;
+      {% endfor %}
+      {% endif %}
+      context += "\n";
+      {% endif %}
+      
+      // Get formatting suggestions
+      {% if formatting_data and formatting_data.pages %}
+      context += "--- Formatting Suggestions ---\n";
+      context += `Overall Format Score: {{ formatting_data.score | default(0) }}/100\n`;
+      {% if formatting_data.overall and formatting_data.overall.grade %}
+      context += `Grade: {{ formatting_data.overall.grade }}\n`;
+      {% endif %}
+      let suggestionCount = 0;
+      {% for page in formatting_data.pages[:3] %}
+      {% for sugg in page.suggestions[:3] %}
+      context += `  - [{{ sugg.type | default('info') | upper }}] {{ sugg.title | default('Suggestion') }}: {{ sugg.description | default('') }}\n`;
+      suggestionCount++;
+      {% endfor %}
+      {% endfor %}
+      context += "\n";
+      {% endif %}
+      
+      // Get rewrite opportunities
+      {% if rewrite_data and rewrite_data.opportunities %}
+      context += "--- Rewrite Opportunities ---\n";
+      context += `Total Opportunities: {{ rewrite_data.stats.total_opportunities | default(0) }}\n`;
+      context += `High Priority: {{ rewrite_data.stats.high_count | default(0) }}\n`;
+      context += `Medium Priority: {{ rewrite_data.stats.medium_count | default(0) }}\n`;
+      {% for opp in rewrite_data.opportunities[:5] %}
+      context += `  - [{{ opp.priority | default('medium') | upper }}] {{ opp.type | default('improvement') }}: {{ opp.description[:100] | default('') }}\n`;
+      {% endfor %}
+      context += "\n";
+      {% endif %}
+      
+      context += "=== END OF ANALYSIS CONTEXT ===\n";
+      context += "\nPlease use this analysis data to provide specific, actionable advice about this research paper.\n";
+      
+      return context;
+    }
+
+    // Send message to chat API
+    async function sendChat() {
+      const message = chatInput.value.trim();
+      if (!message) return;
+
+      // Disable input while processing
+      chatInput.value = '';
+      chatSendBtn.disabled = true;
+
+      // Add user message
+      addMessage(message, true);
+      showTyping();
+
+      try {
+        // Get paper context for the AI
+        const paperContext = getPaperContext();
+        
+        const response = await fetch('/chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ 
+            message: message,
+            context: paperContext
+          })
+        });
+
+        const data = await response.json();
+        removeTyping();
+
+        if (data.error) {
+          addMessage('Sorry, I encountered an error: ' + data.error);
+        } else {
+          addMessage(data.reply || 'I apologize, but I could not generate a response.');
+        }
+      } catch (error) {
+        removeTyping();
+        addMessage('Sorry, there was an error connecting to the AI service. Please try again.');
+        console.error('Chat error:', error);
+      } finally {
+        chatSendBtn.disabled = false;
+        chatInput.focus();
+      }
+    }
+
+    // Chat event listeners
+    if (chatSendBtn) {
+      chatSendBtn.addEventListener('click', sendChat);
+    }
+
+    if (chatInput) {
+      chatInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          sendChat();
+        }
+      });
     }
   </script>
 </body>
