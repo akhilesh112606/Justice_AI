@@ -11,3 +11,6 @@ opencv-contrib-python
 Pillow
 deepface
 tf-keras
+PyPDF2
+pdfplumber
+python-docx

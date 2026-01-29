@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>JUSTICE AI - FIR Analyzer</title>
+  <title>ReviewerAI - Autonomous Research Paper Reviewer</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Sora:wght@400;600;700&display=swap" rel="stylesheet">
@@ -307,6 +307,14 @@
     @keyframes badgePulse {
       0%, 100% { opacity: 0.6; transform: scale(0.9); }
       50% { opacity: 1; transform: scale(1.1); }
+    }
+
+    /* Document icon animation */
+    .doc-icon {
+      width: 48px;
+      height: 48px;
+      margin-bottom: 16px;
+      color: #a78bfa;
     }
 
     /* Main Content */
@@ -849,7 +857,7 @@
   <!-- Corner badge to cover Spline watermark -->
   <div class="corner-badge">
     <div class="corner-badge-dot"></div>
-    <span class="corner-badge-text">Justice AI</span>
+    <span class="corner-badge-text">ReviewerAI</span>
   </div>
 
   <div class="content">
@@ -864,18 +872,21 @@
     {% endwith %}
     <section class="hero">
       <div class="hero-content">
-        <h1 class="hero-title reveal">JUSTICE AI</h1>
-        <p class="hero-subtitle reveal">an FIR Analyzer AI</p>
-        <p class="hero-description reveal">Transform your investigation workflow with advanced AI-powered analysis. Upload FIRs and receive comprehensive insights in seconds.</p>
+        <h1 class="hero-title reveal">REVIEWER AI</h1>
+        <p class="hero-subtitle reveal">Autonomous Research Paper Reviewer</p>
+        <p class="hero-description reveal">Evaluate research papers for quality, originality, clarity, and plagiarism risks. Get comprehensive reviewer-style feedback powered by advanced AI in seconds.</p>
 
         <div class="button-group reveal">
           <form id="upload-form" class="upload-form" action="/upload" method="POST" enctype="multipart/form-data">
-            <input class="file-input" type="file" id="fir-file" name="file" accept="image/*">
-            <label for="fir-file" class="btn-primary upload-label">
+            <input class="file-input" type="file" id="paper-file" name="file" accept=".pdf,.doc,.docx">
+            <label for="paper-file" class="btn-primary upload-label">
               <svg class="icon" viewBox="0 0 24 24">
-                <path d="M12 2v20M2 12h20M12 2l-4 4M12 2l4 4"></path>
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                <polyline points="14 2 14 8 20 8"></polyline>
+                <line x1="12" y1="18" x2="12" y2="12"></line>
+                <line x1="9" y1="15" x2="15" y2="15"></line>
               </svg>
-              <span id="upload-label-text">Upload FIR</span>
+              <span id="upload-label-text">Upload Paper</span>
             </label>
           </form>
           <button class="btn-secondary" type="button" onclick="document.getElementById('features').scrollIntoView({ behavior: 'smooth' });">Learn More</button>
@@ -884,28 +895,34 @@
         <div class="features reveal" id="features">
           <div class="feature-card">
             <svg class="feature-icon" viewBox="0 0 24 24">
-              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm3.5-9c.83 0 1.5-.67 1.5-1.5S16.33 8 15.5 8 14 8.67 14 9.5s.67 1.5 1.5 1.5zm-7 0c.83 0 1.5-.67 1.5-1.5S9.33 8 8.5 8 7 8.67 7 9.5 7.67 11 8.5 11zm3.5 6.5c2.33 0 4.31-1.46 5.11-3.5H6.89c.8 2.04 2.78 3.5 5.11 3.5z"></path>
+              <circle cx="11" cy="11" r="8"></circle>
+              <path d="M21 21l-4.35-4.35"></path>
+              <path d="M11 8v6M8 11h6"></path>
             </svg>
-            <h3 class="feature-title">AI-Powered Analysis</h3>
-            <p class="feature-description">Advanced machine learning algorithms analyze FIRs with precision</p>
+            <h3 class="feature-title">Quality Analysis</h3>
+            <p class="feature-description">Evaluate writing structure, coherence, and overall research methodology</p>
           </div>
 
           <div class="feature-card">
             <svg class="feature-icon" viewBox="0 0 24 24">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8l-6-6z"></path>
+              <path d="M9 12l2 2 4-4"></path>
+              <path d="M21 12c0 4.97-4.03 9-9 9s-9-4.03-9-9 4.03-9 9-9c1.5 0 2.91.37 4.15 1.02"></path>
+              <path d="M22 4L12 14.01l-3-3"></path>
+            </svg>
+            <h3 class="feature-title">Originality Check</h3>
+            <p class="feature-description">Detect potential plagiarism risks and verify content authenticity</p>
+          </div>
+
+          <div class="feature-card">
+            <svg class="feature-icon" viewBox="0 0 24 24">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
               <polyline points="14 2 14 8 20 8"></polyline>
+              <line x1="16" y1="13" x2="8" y2="13"></line>
+              <line x1="16" y1="17" x2="8" y2="17"></line>
+              <polyline points="10 9 9 9 8 9"></polyline>
             </svg>
-            <h3 class="feature-title">Instant Insights</h3>
-            <p class="feature-description">Get comprehensive reports and actionable intelligence instantly</p>
-          </div>
-
-          <div class="feature-card">
-            <svg class="feature-icon" viewBox="0 0 24 24">
-              <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"></path>
-              <polyline points="10 17 14 17 12 11"></polyline>
-            </svg>
-            <h3 class="feature-title">Secure & Confidential</h3>
-            <p class="feature-description">Military-grade encryption ensures data security and privacy</p>
+            <h3 class="feature-title">Citation Review</h3>
+            <p class="feature-description">Analyze citation quality, relevance, and academic formatting standards</p>
           </div>
         </div>
       </div>
@@ -913,20 +930,20 @@
 
     <section class="stats container reveal" id="about">
       <div class="stat-card">
-        <div class="stat-number">99.9%</div>
-        <div class="stat-label">Accuracy Rate</div>
+        <div class="stat-number">98%</div>
+        <div class="stat-label">Review Accuracy</div>
       </div>
       <div class="stat-card">
-        <div class="stat-number">&lt;5s</div>
+        <div class="stat-number">&lt;30s</div>
         <div class="stat-label">Analysis Time</div>
       </div>
       <div class="stat-card">
-        <div class="stat-number">24/7</div>
-        <div class="stat-label">Availability</div>
+        <div class="stat-number">50+</div>
+        <div class="stat-label">Review Criteria</div>
       </div>
       <div class="stat-card">
-        <div class="stat-number">100%</div>
-        <div class="stat-label">Secure</div>
+        <div class="stat-number">AI</div>
+        <div class="stat-label">Powered Insights</div>
       </div>
     </section>
 
@@ -937,21 +954,30 @@
         <div class="processing-copy">
           <div class="processing-badge">
             <div class="pulse-dot"></div>
-            <span>Live OCR Scan</span>
+            <span>AI Review in Progress</span>
           </div>
-          <div class="processing-title">Scanning your FIR</div>
-          <div class="processing-subtitle">Hold tight while we sweep the document. We are enhancing clarity, detecting text lines, and preparing the dashboard for you.</div>
+          <div class="processing-title">Analyzing Your Paper</div>
+          <div class="processing-subtitle">Our AI is evaluating quality, originality, clarity, and citation integrity. Generating comprehensive reviewer-style feedback for you.</div>
           <div class="processing-meta">
             <div class="status-dots"><span></span><span></span><span></span></div>
-            <span>Secure pipeline active</span>
+            <span>Multi-criteria analysis active</span>
           </div>
           <div class="processing-footer">
             <div class="progress-bar"><div class="progress-fill"></div></div>
-            <div class="processing-subtitle" style="color:#b8f3ff; font-size: 13px;">Real-time inference • AES encrypted uplink • Adaptive OCR</div>
+            <div class="processing-subtitle" style="color:#b8f3ff; font-size: 13px;">Plagiarism detection • Structure analysis • Citation verification</div>
           </div>
         </div>
         <div class="processing-frame">
-          <img id="preview-image" alt="FIR preview" />
+          <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; padding: 32px;">
+            <svg style="width: 80px; height: 80px; color: #a78bfa; margin-bottom: 24px;" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              <polyline points="14 2 14 8 20 8"></polyline>
+              <line x1="16" y1="13" x2="8" y2="13"></line>
+              <line x1="16" y1="17" x2="8" y2="17"></line>
+              <polyline points="10 9 9 9 8 9"></polyline>
+            </svg>
+            <div id="file-name-display" style="color: #ffffff; font-size: 16px; font-weight: 600; text-align: center; word-break: break-word;"></div>
+          </div>
           <div class="frame-glow"></div>
           <div class="scan-grid"></div>
           <div class="scan-line"></div>
@@ -1018,11 +1044,11 @@
       });
     });
 
-    const fileInput = document.getElementById('fir-file');
+    const fileInput = document.getElementById('paper-file');
     const uploadForm = document.getElementById('upload-form');
     const uploadLabelText = document.getElementById('upload-label-text');
     const processingOverlay = document.getElementById('processing-overlay');
-    const previewImage = document.getElementById('preview-image');
+    const fileNameDisplay = document.getElementById('file-name-display');
 
     if (fileInput && uploadForm) {
       fileInput.addEventListener('change', () => {
@@ -1035,19 +1061,13 @@
               processingOverlay.classList.add('active');
               document.body.classList.add('scanning');
             }
+            if (fileNameDisplay && file) {
+              fileNameDisplay.textContent = file.name;
+            }
             setTimeout(() => uploadForm.submit(), 180);
           };
 
-          if (file && previewImage && window.FileReader) {
-            const reader = new FileReader();
-            reader.onload = (event) => {
-              previewImage.src = event.target && event.target.result ? event.target.result : '';
-              showOverlayAndSubmit();
-            };
-            reader.readAsDataURL(file);
-          } else {
-            showOverlayAndSubmit();
-          }
+          showOverlayAndSubmit();
         }
       });
     }

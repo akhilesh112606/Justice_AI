@@ -22,6 +22,19 @@ from reportlab.lib.utils import simpleSplit
 from reportlab.pdfgen import canvas
 from werkzeug.utils import secure_filename
 
+# PDF and DOCX extraction
+try:
+    import pdfplumber
+    PDFPLUMBER_AVAILABLE = True
+except ImportError:
+    PDFPLUMBER_AVAILABLE = False
+
+try:
+    from docx import Document as DocxDocument
+    DOCX_AVAILABLE = True
+except ImportError:
+    DOCX_AVAILABLE = False
+
 # DeepFace for accurate face recognition
 try:
     from deepface import DeepFace
@@ -1032,13 +1045,17 @@ def upload():
     # Accept both "image" (used by dashboard fetch) and "file" (generic form name)
     file = request.files.get("image") or request.files.get("file")
     if not file or file.filename.strip() == "":
-        flash("Please choose an image to upload.", "error")
+        flash("Please choose a file to upload.", "error")
         return redirect(url_for("main.index"))
 
     filename = secure_filename(file.filename)
     ext = os.path.splitext(filename)[1].lower()
-    if ext not in {".png", ".jpg", ".jpeg", ".bmp", ".tiff", ".tif", ".webp"}:
-        flash("Unsupported file type. Please upload an image.", "error")
+    
+    # Supported file types for research paper reviewer
+    supported_extensions = {".pdf", ".doc", ".docx"}
+    
+    if ext not in supported_extensions:
+        flash("Unsupported file type. Please upload a PDF or Word document.", "error")
         return redirect(url_for("main.index"))
 
     with tempfile.NamedTemporaryFile(delete=False, suffix=ext) as tmp:
@@ -1047,9 +1064,14 @@ def upload():
 
     text = ""
     try:
-        text = extract_text(temp_path)
+        if ext == ".pdf":
+            text = extract_text_from_pdf(temp_path)
+        elif ext in {".doc", ".docx"}:
+            text = extract_text_from_docx(temp_path)
+        else:
+            text = "Unsupported file format."
     except Exception as exc:  # noqa: BLE001
-        flash(f"OCR failed: {exc}", "error")
+        flash(f"Text extraction failed: {exc}", "error")
         return redirect(url_for("main.index"))
     finally:
         try:
@@ -1057,38 +1079,16 @@ def upload():
         except OSError:
             pass
 
-    cleaned_text = text.strip() if text else "No text detected."
+    extracted_text = text.strip() if text else "No text detected in the document."
 
-    formatted_text = format_text(cleaned_text)
-
-    _debug("upload.cleaned_text_len", len(cleaned_text))
-    _debug("upload.formatted_text_len", len(formatted_text))
-
-    characters, general_questions = build_questions(formatted_text)
-    character_profiles = extract_character_profiles(formatted_text)
-    roadmap_steps = build_roadmap(formatted_text, characters, general_questions)
-    locations = extract_locations(formatted_text)
-    legal_sections, legal_audit = build_judicial_sections(formatted_text)
-
-    _debug("upload.characters_count", len(characters))
-    _debug("upload.general_questions_count", len(general_questions))
-    _debug("upload.profiles_count", len(character_profiles))
-    _debug("upload.character_profiles_data", character_profiles)
-    _debug("upload.roadmap_steps_count", len(roadmap_steps))
-    _debug("upload.locations_count", len(locations))
-    _debug("upload.legal_sections_count", len(legal_sections))
-    _debug("upload.legal_audit", legal_audit)
+    _debug("upload.extracted_text_len", len(extracted_text))
 
     return render_template(
-        "dashboard.html",
-        extracted_text=formatted_text,
-        character_questions=characters,
-        character_profiles=character_profiles,
-        general_questions=general_questions,
-        roadmap_steps=roadmap_steps,
-        locations=locations,
-        legal_sections=legal_sections,
-        legal_audit=legal_audit,
+        "results.html",
+        filename=filename,
+        extracted_text=extracted_text,
+        word_count=len(extracted_text.split()),
+        char_count=len(extracted_text),
     )
 
 
@@ -1782,6 +1782,41 @@ def build_roadmap(extracted_text: str, characters: list, general_questions: list
         return normalized or default_steps
     except Exception:
         return default_steps
+
+
+def extract_text_from_pdf(pdf_path: str) -> str:
+    """Extract text from a PDF file using pdfplumber."""
+    if not PDFPLUMBER_AVAILABLE:
+        raise ImportError("pdfplumber is not installed. Please run: pip install pdfplumber")
+    
+    text_parts = []
+    try:
+        with pdfplumber.open(pdf_path) as pdf:
+            for page in pdf.pages:
+                page_text = page.extract_text()
+                if page_text:
+                    text_parts.append(page_text)
+    except Exception as exc:
+        raise ValueError(f"Failed to extract text from PDF: {exc}")
+    
+    return "\n\n".join(text_parts)
+
+
+def extract_text_from_docx(docx_path: str) -> str:
+    """Extract text from a DOCX file using python-docx."""
+    if not DOCX_AVAILABLE:
+        raise ImportError("python-docx is not installed. Please run: pip install python-docx")
+    
+    text_parts = []
+    try:
+        doc = DocxDocument(docx_path)
+        for paragraph in doc.paragraphs:
+            if paragraph.text.strip():
+                text_parts.append(paragraph.text)
+    except Exception as exc:
+        raise ValueError(f"Failed to extract text from DOCX: {exc}")
+    
+    return "\n\n".join(text_parts)
 
 
 def format_text(raw_text: str) -> str:
