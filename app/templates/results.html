@@ -287,6 +287,367 @@
       .actions .btn { width: 100%; justify-content: center; }
       .summary-lists { grid-template-columns: 1fr; }
     }
+
+    /* ==================== PLAGIARISM PANEL STYLES ==================== */
+    .plagiarism-section { 
+      margin-top: 32px; 
+      animation: fadeInUp 0.8s ease-out 0.4s forwards; 
+      opacity: 0; 
+    }
+
+    .plagiarism-panel { 
+      background: rgba(255, 255, 255, 0.03); 
+      border: 1px solid rgba(255, 255, 255, 0.08); 
+      border-radius: 20px; 
+      backdrop-filter: blur(16px); 
+      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.06) inset; 
+      overflow: hidden; 
+    }
+
+    .plagiarism-header { 
+      display: flex; 
+      align-items: center; 
+      justify-content: space-between; 
+      padding: 20px 24px; 
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08); 
+      background: rgba(255, 255, 255, 0.02); 
+    }
+
+    .plagiarism-title { 
+      display: flex; 
+      align-items: center; 
+      gap: 12px; 
+      font-size: 18px; 
+      font-weight: 600; 
+    }
+
+    .plagiarism-title svg { width: 24px; height: 24px; color: #8af3ff; }
+
+    /* Score circle */
+    .score-circle-container { display: flex; align-items: center; gap: 16px; }
+
+    .score-circle { 
+      position: relative; 
+      width: 72px; 
+      height: 72px; 
+    }
+
+    .score-circle svg { 
+      transform: rotate(-90deg); 
+      width: 72px; 
+      height: 72px; 
+    }
+
+    .score-circle-bg { 
+      fill: none; 
+      stroke: rgba(255, 255, 255, 0.1); 
+      stroke-width: 6; 
+    }
+
+    .score-circle-progress { 
+      fill: none; 
+      stroke-width: 6; 
+      stroke-linecap: round; 
+      transition: stroke-dashoffset 1s ease-out; 
+    }
+
+    .score-circle-progress.low-risk { stroke: #10b981; }
+    .score-circle-progress.moderate-risk { stroke: #fbbf24; }
+    .score-circle-progress.elevated-risk { stroke: #f97316; }
+    .score-circle-progress.high-risk { stroke: #ef4444; }
+
+    .score-circle-text { 
+      position: absolute; 
+      top: 50%; 
+      left: 50%; 
+      transform: translate(-50%, -50%); 
+      font-size: 18px; 
+      font-weight: 700; 
+      color: #ffffff; 
+    }
+
+    .score-info { text-align: left; }
+    .score-label { font-size: 11px; text-transform: uppercase; letter-spacing: 1px; color: #9ca3af; margin-bottom: 4px; }
+    .score-value { font-size: 24px; font-weight: 700; }
+    .score-value.low-risk { color: #10b981; }
+    .score-value.moderate-risk { color: #fbbf24; }
+    .score-value.elevated-risk { color: #f97316; }
+    .score-value.high-risk { color: #ef4444; }
+
+    /* Risk badge */
+    .risk-badge { 
+      display: inline-flex; 
+      align-items: center; 
+      gap: 6px; 
+      padding: 6px 14px; 
+      border-radius: 20px; 
+      font-size: 12px; 
+      font-weight: 600; 
+      text-transform: uppercase; 
+      letter-spacing: 0.5px; 
+    }
+
+    .risk-badge.low { background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3); }
+    .risk-badge.moderate { background: rgba(251, 191, 36, 0.15); color: #fbbf24; border: 1px solid rgba(251, 191, 36, 0.3); }
+    .risk-badge.elevated { background: rgba(249, 115, 22, 0.15); color: #f97316; border: 1px solid rgba(249, 115, 22, 0.3); }
+    .risk-badge.high { background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3); }
+
+    .risk-badge svg { width: 14px; height: 14px; }
+
+    /* Plagiarism content */
+    .plagiarism-content { padding: 24px; }
+
+    /* Component scores grid */
+    .component-scores { 
+      display: grid; 
+      grid-template-columns: repeat(5, 1fr); 
+      gap: 12px; 
+      margin-bottom: 24px; 
+    }
+
+    @media (max-width: 900px) {
+      .component-scores { grid-template-columns: repeat(3, 1fr); }
+    }
+
+    @media (max-width: 600px) {
+      .component-scores { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    .component-score-card { 
+      padding: 16px; 
+      background: rgba(255, 255, 255, 0.03); 
+      border: 1px solid rgba(255, 255, 255, 0.08); 
+      border-radius: 14px; 
+      text-align: center; 
+      transition: all 0.3s ease; 
+    }
+
+    .component-score-card:hover { 
+      background: rgba(255, 255, 255, 0.06); 
+      border-color: rgba(138, 243, 255, 0.2); 
+      transform: translateY(-2px); 
+    }
+
+    .component-icon { 
+      width: 36px; 
+      height: 36px; 
+      margin: 0 auto 10px; 
+      border-radius: 10px; 
+      display: flex; 
+      align-items: center; 
+      justify-content: center; 
+    }
+
+    .component-icon svg { width: 20px; height: 20px; }
+    .component-icon.green { background: rgba(16, 185, 129, 0.15); color: #10b981; }
+    .component-icon.yellow { background: rgba(251, 191, 36, 0.15); color: #fbbf24; }
+    .component-icon.orange { background: rgba(249, 115, 22, 0.15); color: #f97316; }
+    .component-icon.red { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
+    .component-icon.cyan { background: rgba(138, 243, 255, 0.15); color: #8af3ff; }
+
+    .component-score-value { font-size: 22px; font-weight: 700; margin-bottom: 4px; }
+    .component-score-value.excellent { color: #10b981; }
+    .component-score-value.good { color: #8af3ff; }
+    .component-score-value.moderate { color: #fbbf24; }
+    .component-score-value.poor { color: #ef4444; }
+
+    .component-score-label { font-size: 11px; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.5px; }
+
+    /* Analysis tabs */
+    .analysis-tabs { 
+      display: flex; 
+      gap: 8px; 
+      padding: 12px 0; 
+      margin-bottom: 16px; 
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08); 
+      overflow-x: auto; 
+    }
+
+    .analysis-tab { 
+      padding: 10px 18px; 
+      background: rgba(255, 255, 255, 0.04); 
+      border: 1px solid rgba(255, 255, 255, 0.1); 
+      border-radius: 10px; 
+      font-size: 13px; 
+      font-weight: 500; 
+      color: #9ca3af; 
+      cursor: pointer; 
+      transition: all 0.3s ease; 
+      white-space: nowrap; 
+    }
+
+    .analysis-tab:hover { background: rgba(255, 255, 255, 0.08); color: #ffffff; }
+    .analysis-tab.active { 
+      background: linear-gradient(135deg, rgba(138, 243, 255, 0.15), rgba(94, 210, 255, 0.1)); 
+      border-color: rgba(138, 243, 255, 0.4); 
+      color: #8af3ff; 
+    }
+
+    /* Analysis panels */
+    .analysis-panel { display: none; }
+    .analysis-panel.active { display: block; animation: fadeInUp 0.4s ease-out; }
+
+    /* Issues list */
+    .issues-list { margin-bottom: 20px; }
+
+    .issue-item { 
+      display: flex; 
+      align-items: flex-start; 
+      gap: 12px; 
+      padding: 14px 16px; 
+      background: rgba(255, 255, 255, 0.02); 
+      border: 1px solid rgba(255, 255, 255, 0.06); 
+      border-radius: 12px; 
+      margin-bottom: 10px; 
+    }
+
+    .issue-icon { 
+      width: 28px; 
+      height: 28px; 
+      border-radius: 8px; 
+      display: flex; 
+      align-items: center; 
+      justify-content: center; 
+      flex-shrink: 0; 
+    }
+
+    .issue-icon svg { width: 16px; height: 16px; }
+    .issue-icon.high { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
+    .issue-icon.medium { background: rgba(251, 191, 36, 0.15); color: #fbbf24; }
+    .issue-icon.low { background: rgba(138, 243, 255, 0.15); color: #8af3ff; }
+
+    .issue-content { flex: 1; }
+    .issue-type { font-size: 10px; text-transform: uppercase; letter-spacing: 0.5px; color: #6b7280; margin-bottom: 4px; }
+    .issue-message { font-size: 14px; color: #e5e7eb; }
+
+    /* Duplicate items */
+    .duplicate-item { 
+      padding: 14px; 
+      background: rgba(239, 68, 68, 0.05); 
+      border: 1px solid rgba(239, 68, 68, 0.15); 
+      border-radius: 12px; 
+      margin-bottom: 12px; 
+    }
+
+    .duplicate-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+    .duplicate-type { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #ef4444; }
+    .duplicate-similarity { font-size: 12px; color: #fbbf24; font-weight: 600; }
+
+    .duplicate-text { 
+      font-family: monospace; 
+      font-size: 12px; 
+      color: #d1d5db; 
+      padding: 10px; 
+      background: rgba(0, 0, 0, 0.3); 
+      border-radius: 8px; 
+      word-break: break-word; 
+    }
+
+    /* Vocabulary stats */
+    .vocab-stats { 
+      display: grid; 
+      grid-template-columns: repeat(4, 1fr); 
+      gap: 12px; 
+      margin-bottom: 20px; 
+    }
+
+    @media (max-width: 700px) {
+      .vocab-stats { grid-template-columns: repeat(2, 1fr); }
+    }
+
+    .vocab-stat { 
+      padding: 14px; 
+      background: rgba(255, 255, 255, 0.03); 
+      border: 1px solid rgba(255, 255, 255, 0.08); 
+      border-radius: 12px; 
+      text-align: center; 
+    }
+
+    .vocab-stat-value { font-size: 20px; font-weight: 700; color: #8af3ff; margin-bottom: 4px; }
+    .vocab-stat-label { font-size: 11px; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.5px; }
+
+    /* Common phrases list */
+    .phrase-list { max-height: 300px; overflow-y: auto; }
+
+    .phrase-item { 
+      display: flex; 
+      align-items: center; 
+      justify-content: space-between; 
+      padding: 10px 14px; 
+      background: rgba(255, 255, 255, 0.02); 
+      border-radius: 8px; 
+      margin-bottom: 8px; 
+    }
+
+    .phrase-text { font-size: 13px; color: #d1d5db; flex: 1; }
+    .phrase-count { 
+      font-size: 12px; 
+      font-weight: 600; 
+      padding: 3px 10px; 
+      border-radius: 12px; 
+      background: rgba(138, 243, 255, 0.1); 
+      color: #8af3ff; 
+    }
+
+    /* Citation analysis */
+    .citation-grid { 
+      display: grid; 
+      grid-template-columns: repeat(3, 1fr); 
+      gap: 12px; 
+      margin-bottom: 20px; 
+    }
+
+    @media (max-width: 700px) {
+      .citation-grid { grid-template-columns: 1fr; }
+    }
+
+    .citation-card { 
+      padding: 16px; 
+      background: rgba(255, 255, 255, 0.03); 
+      border: 1px solid rgba(255, 255, 255, 0.08); 
+      border-radius: 14px; 
+    }
+
+    .citation-card-header { font-size: 12px; color: #9ca3af; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px; }
+    .citation-card-value { font-size: 24px; font-weight: 700; color: #ffffff; }
+    .citation-card-value.highlight { color: #8af3ff; }
+
+    /* LLM Assessment */
+    .llm-assessment { 
+      padding: 16px; 
+      background: linear-gradient(135deg, rgba(138, 243, 255, 0.06), rgba(94, 210, 255, 0.03)); 
+      border: 1px solid rgba(138, 243, 255, 0.15); 
+      border-radius: 14px; 
+      margin-top: 20px; 
+    }
+
+    .llm-assessment-header { 
+      display: flex; 
+      align-items: center; 
+      gap: 10px; 
+      margin-bottom: 12px; 
+      font-size: 14px; 
+      font-weight: 600; 
+      color: #8af3ff; 
+    }
+
+    .llm-assessment-header svg { width: 18px; height: 18px; }
+
+    .llm-assessment-text { font-size: 14px; color: #d1d5db; line-height: 1.6; margin-bottom: 12px; }
+
+    .llm-recommendations { list-style: none; }
+    .llm-recommendations li { 
+      padding: 8px 0 8px 20px; 
+      position: relative; 
+      font-size: 13px; 
+      color: #9ca3af; 
+    }
+    .llm-recommendations li::before { 
+      content: '→'; 
+      position: absolute; 
+      left: 0; 
+      color: #8af3ff; 
+    }
   </style>
 </head>
 <body>
@@ -582,6 +943,314 @@
           {% endif %}
         </div>
       </div>
+
+      <!-- Plagiarism Analysis Section -->
+      {% if plagiarism_data %}
+      <div class="plagiarism-section">
+        <div class="plagiarism-panel">
+          <div class="plagiarism-header">
+            <div class="plagiarism-title">
+              <svg viewBox="0 0 24 24"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"></path><rect x="9" y="3" width="6" height="4" rx="1"></rect><path d="M9 12h6"></path><path d="M9 16h6"></path></svg>
+              Plagiarism Analysis
+            </div>
+            <div class="score-circle-container">
+              <div class="score-circle">
+                <svg viewBox="0 0 36 36">
+                  <circle class="score-circle-bg" cx="18" cy="18" r="15.5"></circle>
+                  <circle 
+                    class="score-circle-progress {% if plagiarism_data.overall_score >= 85 %}low-risk{% elif plagiarism_data.overall_score >= 70 %}moderate-risk{% elif plagiarism_data.overall_score >= 50 %}elevated-risk{% else %}high-risk{% endif %}" 
+                    cx="18" cy="18" r="15.5"
+                    stroke-dasharray="97.4"
+                    stroke-dashoffset="{{ 97.4 - (plagiarism_data.overall_score / 100 * 97.4) }}"
+                  ></circle>
+                </svg>
+                <span class="score-circle-text">{{ plagiarism_data.overall_score | round | int }}%</span>
+              </div>
+              <div class="score-info">
+                <div class="score-label">Originality Score</div>
+                <div class="score-value {% if plagiarism_data.overall_score >= 85 %}low-risk{% elif plagiarism_data.overall_score >= 70 %}moderate-risk{% elif plagiarism_data.overall_score >= 50 %}elevated-risk{% else %}high-risk{% endif %}">
+                  {{ plagiarism_data.overall_score | round(1) }}/100
+                </div>
+              </div>
+              <div class="risk-badge {{ plagiarism_data.risk_level }}">
+                {% if plagiarism_data.risk_level == 'low' %}
+                <svg viewBox="0 0 24 24"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                {% elif plagiarism_data.risk_level == 'moderate' %}
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                {% elif plagiarism_data.risk_level == 'elevated' %}
+                <svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                {% else %}
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>
+                {% endif %}
+                {{ plagiarism_data.risk_level | capitalize }} Risk
+              </div>
+            </div>
+          </div>
+
+          <div class="plagiarism-content">
+            <!-- Component Scores -->
+            {% if plagiarism_data.component_scores %}
+            <div class="component-scores">
+              <div class="component-score-card">
+                <div class="component-icon {% if plagiarism_data.component_scores.duplicate_check >= 85 %}green{% elif plagiarism_data.component_scores.duplicate_check >= 70 %}cyan{% elif plagiarism_data.component_scores.duplicate_check >= 50 %}yellow{% else %}red{% endif %}">
+                  <svg viewBox="0 0 24 24"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
+                </div>
+                <div class="component-score-value {% if plagiarism_data.component_scores.duplicate_check >= 85 %}excellent{% elif plagiarism_data.component_scores.duplicate_check >= 70 %}good{% elif plagiarism_data.component_scores.duplicate_check >= 50 %}moderate{% else %}poor{% endif %}">{{ plagiarism_data.component_scores.duplicate_check }}%</div>
+                <div class="component-score-label">Duplicates</div>
+              </div>
+              <div class="component-score-card">
+                <div class="component-icon {% if plagiarism_data.component_scores.vocabulary_richness >= 70 %}green{% elif plagiarism_data.component_scores.vocabulary_richness >= 50 %}cyan{% elif plagiarism_data.component_scores.vocabulary_richness >= 35 %}yellow{% else %}red{% endif %}">
+                  <svg viewBox="0 0 24 24"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
+                </div>
+                <div class="component-score-value {% if plagiarism_data.component_scores.vocabulary_richness >= 70 %}excellent{% elif plagiarism_data.component_scores.vocabulary_richness >= 50 %}good{% elif plagiarism_data.component_scores.vocabulary_richness >= 35 %}moderate{% else %}poor{% endif %}">{{ plagiarism_data.component_scores.vocabulary_richness }}%</div>
+                <div class="component-score-label">Vocabulary</div>
+              </div>
+              <div class="component-score-card">
+                <div class="component-icon {% if plagiarism_data.component_scores.phrase_originality >= 85 %}green{% elif plagiarism_data.component_scores.phrase_originality >= 70 %}cyan{% elif plagiarism_data.component_scores.phrase_originality >= 50 %}yellow{% else %}red{% endif %}">
+                  <svg viewBox="0 0 24 24"><line x1="17" y1="10" x2="3" y2="10"></line><line x1="21" y1="6" x2="3" y2="6"></line><line x1="21" y1="14" x2="3" y2="14"></line><line x1="17" y1="18" x2="3" y2="18"></line></svg>
+                </div>
+                <div class="component-score-value {% if plagiarism_data.component_scores.phrase_originality >= 85 %}excellent{% elif plagiarism_data.component_scores.phrase_originality >= 70 %}good{% elif plagiarism_data.component_scores.phrase_originality >= 50 %}moderate{% else %}poor{% endif %}">{{ plagiarism_data.component_scores.phrase_originality }}%</div>
+                <div class="component-score-label">Originality</div>
+              </div>
+              <div class="component-score-card">
+                <div class="component-icon {% if plagiarism_data.component_scores.style_consistency >= 80 %}green{% elif plagiarism_data.component_scores.style_consistency >= 60 %}cyan{% elif plagiarism_data.component_scores.style_consistency >= 40 %}yellow{% else %}red{% endif %}">
+                  <svg viewBox="0 0 24 24"><path d="M12 20h9"></path><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path></svg>
+                </div>
+                <div class="component-score-value {% if plagiarism_data.component_scores.style_consistency >= 80 %}excellent{% elif plagiarism_data.component_scores.style_consistency >= 60 %}good{% elif plagiarism_data.component_scores.style_consistency >= 40 %}moderate{% else %}poor{% endif %}">{{ plagiarism_data.component_scores.style_consistency }}%</div>
+                <div class="component-score-label">Style</div>
+              </div>
+              <div class="component-score-card">
+                <div class="component-icon {% if plagiarism_data.component_scores.citation_quality >= 70 %}green{% elif plagiarism_data.component_scores.citation_quality >= 50 %}cyan{% elif plagiarism_data.component_scores.citation_quality >= 30 %}yellow{% else %}red{% endif %}">
+                  <svg viewBox="0 0 24 24"><path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"></path><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"></path><path d="M4 22h16"></path><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"></path><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"></path><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"></path></svg>
+                </div>
+                <div class="component-score-value {% if plagiarism_data.component_scores.citation_quality >= 70 %}excellent{% elif plagiarism_data.component_scores.citation_quality >= 50 %}good{% elif plagiarism_data.component_scores.citation_quality >= 30 %}moderate{% else %}poor{% endif %}">{{ plagiarism_data.component_scores.citation_quality }}%</div>
+                <div class="component-score-label">Citations</div>
+              </div>
+            </div>
+            {% endif %}
+
+            <!-- Issues -->
+            {% if plagiarism_data.issues %}
+            <div class="issues-list">
+              <h4 style="font-size: 14px; font-weight: 600; color: #ffffff; margin-bottom: 12px;">Detected Issues</h4>
+              {% for issue in plagiarism_data.issues %}
+              <div class="issue-item">
+                <div class="issue-icon {{ issue.severity }}">
+                  {% if issue.severity == 'high' %}
+                  <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>
+                  {% elif issue.severity == 'medium' %}
+                  <svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                  {% else %}
+                  <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                  {% endif %}
+                </div>
+                <div class="issue-content">
+                  <div class="issue-type">{{ issue.type | replace('_', ' ') }}</div>
+                  <div class="issue-message">{{ issue.message }}</div>
+                </div>
+              </div>
+              {% endfor %}
+            </div>
+            {% endif %}
+
+            <!-- Analysis Tabs -->
+            <div class="analysis-tabs" id="plagiarism-tabs">
+              <button class="analysis-tab active" data-panel="duplicates">Duplicates</button>
+              <button class="analysis-tab" data-panel="vocabulary">Vocabulary</button>
+              <button class="analysis-tab" data-panel="phrases">Common Phrases</button>
+              <button class="analysis-tab" data-panel="style">Style Analysis</button>
+              <button class="analysis-tab" data-panel="citations">Citations</button>
+            </div>
+
+            <!-- Duplicates Panel -->
+            <div class="analysis-panel active" data-panel="duplicates">
+              {% if plagiarism_data.analyses and plagiarism_data.analyses.internal_duplicates %}
+              {% set dups = plagiarism_data.analyses.internal_duplicates %}
+              <p style="font-size: 14px; color: #9ca3af; margin-bottom: 16px;">
+                Found {{ dups.duplicate_count }} internal duplicate(s) ({{ dups.duplicate_percentage }}% of content)
+              </p>
+              {% if dups.duplicates %}
+              {% for dup in dups.duplicates[:5] %}
+              <div class="duplicate-item">
+                <div class="duplicate-header">
+                  <span class="duplicate-type">{{ dup.type | replace('_', ' ') | title }}</span>
+                  {% if dup.similarity %}
+                  <span class="duplicate-similarity">{{ dup.similarity }}% similar</span>
+                  {% endif %}
+                </div>
+                <div class="duplicate-text">"{{ dup.text }}"</div>
+                {% if dup.similar_to %}
+                <div style="margin-top: 8px; font-size: 12px; color: #6b7280;">Similar to:</div>
+                <div class="duplicate-text" style="margin-top: 4px; opacity: 0.7;">"{{ dup.similar_to }}"</div>
+                {% endif %}
+              </div>
+              {% endfor %}
+              {% else %}
+              <div class="empty-state" style="padding: 20px;">
+                <svg viewBox="0 0 24 24" style="width: 32px; height: 32px;"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                <h4>No Duplicates Found</h4>
+                <p>Great! No significant internal duplicate content detected.</p>
+              </div>
+              {% endif %}
+              {% endif %}
+            </div>
+
+            <!-- Vocabulary Panel -->
+            <div class="analysis-panel" data-panel="vocabulary">
+              {% if plagiarism_data.analyses and plagiarism_data.analyses.vocabulary %}
+              {% set vocab = plagiarism_data.analyses.vocabulary %}
+              <div class="vocab-stats">
+                <div class="vocab-stat">
+                  <div class="vocab-stat-value">{{ vocab.total_words | default(0) }}</div>
+                  <div class="vocab-stat-label">Total Words</div>
+                </div>
+                <div class="vocab-stat">
+                  <div class="vocab-stat-value">{{ vocab.unique_words | default(0) }}</div>
+                  <div class="vocab-stat-label">Unique Words</div>
+                </div>
+                <div class="vocab-stat">
+                  <div class="vocab-stat-value">{{ vocab.vocabulary_richness | default(0) }}%</div>
+                  <div class="vocab-stat-label">Type-Token Ratio</div>
+                </div>
+                <div class="vocab-stat">
+                  <div class="vocab-stat-value">{{ vocab.hapax_legomena | default(0) }}</div>
+                  <div class="vocab-stat-label">Hapax Legomena</div>
+                </div>
+              </div>
+              <p style="font-size: 13px; color: #9ca3af;">
+                <strong>Assessment:</strong> {{ vocab.assessment | default('N/A') | title }}
+                {% if vocab.assessment == 'excellent' %}
+                — Excellent vocabulary diversity indicates original writing.
+                {% elif vocab.assessment == 'good' %}
+                — Good vocabulary range suggests authentic content.
+                {% elif vocab.assessment == 'moderate' %}
+                — Moderate diversity; consider varying word choice.
+                {% else %}
+                — Low vocabulary diversity may indicate copied or templated content.
+                {% endif %}
+              </p>
+              {% endif %}
+            </div>
+
+            <!-- Common Phrases Panel -->
+            <div class="analysis-panel" data-panel="phrases">
+              {% if plagiarism_data.analyses and plagiarism_data.analyses.common_phrases %}
+              {% set phrases = plagiarism_data.analyses.common_phrases %}
+              <p style="font-size: 14px; color: #9ca3af; margin-bottom: 16px;">
+                Boilerplate density: {{ phrases.boilerplate_density }}% ({{ phrases.risk_level | title }} Risk)
+              </p>
+              {% if phrases.common_phrases %}
+              <div class="phrase-list">
+                {% for phrase in phrases.common_phrases[:10] %}
+                <div class="phrase-item">
+                  <span class="phrase-text">"{{ phrase.phrase }}"</span>
+                  <span class="phrase-count">{{ phrase.count }}x</span>
+                </div>
+                {% endfor %}
+              </div>
+              {% else %}
+              <div class="empty-state" style="padding: 20px;">
+                <svg viewBox="0 0 24 24" style="width: 32px; height: 32px;"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                <h4>Low Boilerplate Usage</h4>
+                <p>Document shows minimal use of common academic phrases.</p>
+              </div>
+              {% endif %}
+              {% endif %}
+            </div>
+
+            <!-- Style Panel -->
+            <div class="analysis-panel" data-panel="style">
+              {% if plagiarism_data.analyses and plagiarism_data.analyses.style_consistency %}
+              {% set style = plagiarism_data.analyses.style_consistency %}
+              <p style="font-size: 14px; color: #9ca3af; margin-bottom: 16px;">
+                Style Consistency Score: <strong style="color: #8af3ff;">{{ style.consistency_score }}%</strong>
+                ({{ style.paragraph_count | default(0) }} paragraphs analyzed)
+              </p>
+              {% if style.variations %}
+              <div class="issues-list">
+                {% for variation in style.variations %}
+                <div class="issue-item">
+                  <div class="issue-icon {{ variation.severity }}">
+                    <svg viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path></svg>
+                  </div>
+                  <div class="issue-content">
+                    <div class="issue-type">{{ variation.metric | replace('_', ' ') }}</div>
+                    <div class="issue-message">{{ variation.description }}</div>
+                  </div>
+                </div>
+                {% endfor %}
+              </div>
+              {% else %}
+              <div class="empty-state" style="padding: 20px;">
+                <svg viewBox="0 0 24 24" style="width: 32px; height: 32px;"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                <h4>Consistent Writing Style</h4>
+                <p>Writing style appears consistent throughout the document.</p>
+              </div>
+              {% endif %}
+              {% endif %}
+            </div>
+
+            <!-- Citations Panel -->
+            <div class="analysis-panel" data-panel="citations">
+              {% if plagiarism_data.analyses and plagiarism_data.analyses.citations %}
+              {% set cites = plagiarism_data.analyses.citations %}
+              <div class="citation-grid">
+                <div class="citation-card">
+                  <div class="citation-card-header">Total Citations</div>
+                  <div class="citation-card-value highlight">{{ cites.total_citations | default(0) }}</div>
+                </div>
+                <div class="citation-card">
+                  <div class="citation-card-header">Primary Style</div>
+                  <div class="citation-card-value">{{ cites.primary_style | default('None') | upper }}</div>
+                </div>
+                <div class="citation-card">
+                  <div class="citation-card-header">Citation Density</div>
+                  <div class="citation-card-value">{{ cites.citation_density | default(0) }} per 100 words</div>
+                </div>
+              </div>
+              {% if cites.mixed_styles %}
+              <div class="issue-item" style="margin-bottom: 12px;">
+                <div class="issue-icon low">
+                  <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                </div>
+                <div class="issue-content">
+                  <div class="issue-type">Mixed Styles</div>
+                  <div class="issue-message">Multiple citation styles detected. Consider using a consistent format.</div>
+                </div>
+              </div>
+              {% endif %}
+              {% if cites.uncited_quotes %}
+              <h5 style="font-size: 13px; color: #fbbf24; margin: 16px 0 12px;">Uncited Quoted Content</h5>
+              {% for quote in cites.uncited_quotes %}
+              <div class="duplicate-item" style="border-color: rgba(251, 191, 36, 0.3); background: rgba(251, 191, 36, 0.05);">
+                <div class="duplicate-text">{{ quote.quote }}</div>
+              </div>
+              {% endfor %}
+              {% endif %}
+              {% endif %}
+            </div>
+
+            <!-- LLM Assessment -->
+            {% if plagiarism_data.llm_enhanced and plagiarism_data.llm_assessment %}
+            <div class="llm-assessment">
+              <div class="llm-assessment-header">
+                <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"></circle><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"></path></svg>
+                AI-Enhanced Assessment
+              </div>
+              <p class="llm-assessment-text">{{ plagiarism_data.llm_assessment }}</p>
+              {% if plagiarism_data.llm_recommendations %}
+              <ul class="llm-recommendations">
+                {% for rec in plagiarism_data.llm_recommendations %}
+                <li>{{ rec }}</li>
+                {% endfor %}
+              </ul>
+              {% endif %}
+            </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      {% endif %}
 
       <div class="actions">
         <a href="/" class="btn btn-secondary">
@@ -1009,6 +1678,41 @@
         }
       }, 200);
     });
+
+    // Plagiarism Analysis Tab Switching
+    const plagiarismTabs = document.querySelectorAll('#plagiarism-tabs .analysis-tab');
+    const analysisPanels = document.querySelectorAll('.analysis-panel');
+
+    plagiarismTabs.forEach(tab => {
+      tab.addEventListener('click', () => {
+        const panelName = tab.dataset.panel;
+        
+        // Update active tab
+        plagiarismTabs.forEach(t => t.classList.remove('active'));
+        tab.classList.add('active');
+        
+        // Show corresponding panel
+        analysisPanels.forEach(panel => {
+          if (panel.dataset.panel === panelName) {
+            panel.classList.add('active');
+          } else {
+            panel.classList.remove('active');
+          }
+        });
+      });
+    });
+
+    // Animate score circle on load
+    const scoreCircle = document.querySelector('.score-circle-progress');
+    if (scoreCircle) {
+      const finalOffset = scoreCircle.getAttribute('stroke-dashoffset');
+      scoreCircle.style.strokeDashoffset = '97.4';
+      
+      setTimeout(() => {
+        scoreCircle.style.transition = 'stroke-dashoffset 1.5s ease-out';
+        scoreCircle.style.strokeDashoffset = finalOffset;
+      }, 500);
+    }
   </script>
 </body>
 </html>

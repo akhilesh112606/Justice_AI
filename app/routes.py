@@ -1097,6 +1097,13 @@ def upload():
     formatting_data = analyze_formatting_suggestions(extracted_text, filename, pdf_positions)
     _debug("upload.formatting_score", formatting_data.get("score", 0))
 
+    # Analyze plagiarism
+    plagiarism_data = analyze_plagiarism(extracted_text, filename)
+    # Optionally enhance with LLM if score is concerning
+    if plagiarism_data.get("overall_score", 100) < 80:
+        plagiarism_data = enhance_plagiarism_with_llm(extracted_text, plagiarism_data)
+    _debug("upload.plagiarism_score", plagiarism_data.get("overall_score", 0))
+
     return render_template(
         "results.html",
         filename=filename,
@@ -1104,6 +1111,7 @@ def upload():
         word_count=len(extracted_text.split()),
         char_count=len(extracted_text),
         formatting_data=formatting_data,
+        plagiarism_data=plagiarism_data,
         pdf_base64=pdf_base64,
         is_pdf=is_pdf,
     )
@@ -2403,6 +2411,699 @@ def _analyze_formatting_rules(text: str, pages_text: list, filename: str, pdf_po
         "total_pages": len(pages_text),
         "error": None
     }
+
+
+# ============================================================================
+# PLAGIARISM DETECTION SYSTEM
+# ============================================================================
+
+def _tokenize_text(text: str) -> list:
+    """Tokenize text into words, removing punctuation and converting to lowercase."""
+    import re
+    # Remove special characters but keep apostrophes in contractions
+    text = re.sub(r"[^\w\s']", " ", text.lower())
+    words = text.split()
+    # Filter out very short words and numbers
+    return [w for w in words if len(w) > 2 and not w.isdigit()]
+
+
+def _create_shingles(words: list, n: int = 5) -> set:
+    """Create n-gram shingles from a list of words."""
+    if len(words) < n:
+        return set([" ".join(words)])
+    return set(" ".join(words[i:i+n]) for i in range(len(words) - n + 1))
+
+
+def _hash_shingle(shingle: str) -> int:
+    """Create a hash value for a shingle."""
+    import hashlib
+    return int(hashlib.md5(shingle.encode()).hexdigest()[:8], 16)
+
+
+def _compute_minhash_signature(shingles: set, num_hashes: int = 100) -> list:
+    """Compute MinHash signature for a set of shingles."""
+    import random
+    random.seed(42)  # Fixed seed for reproducibility
+    
+    if not shingles:
+        return [float('inf')] * num_hashes
+    
+    # Generate hash functions parameters
+    max_val = 2**32 - 1
+    hash_params = [(random.randint(1, max_val), random.randint(0, max_val)) for _ in range(num_hashes)]
+    
+    signature = []
+    for a, b in hash_params:
+        min_hash = float('inf')
+        for shingle in shingles:
+            h = _hash_shingle(shingle)
+            hash_val = (a * h + b) % max_val
+            min_hash = min(min_hash, hash_val)
+        signature.append(min_hash)
+    
+    return signature
+
+
+def _jaccard_similarity(set1: set, set2: set) -> float:
+    """Compute Jaccard similarity between two sets."""
+    if not set1 or not set2:
+        return 0.0
+    intersection = len(set1 & set2)
+    union = len(set1 | set2)
+    return intersection / union if union > 0 else 0.0
+
+
+def _detect_internal_duplicates(text: str) -> dict:
+    """Detect repeated phrases and self-plagiarism within the document."""
+    import re
+    
+    # Split into sentences
+    sentences = re.split(r'[.!?]+', text)
+    sentences = [s.strip() for s in sentences if len(s.strip()) > 30]
+    
+    duplicates = []
+    duplicate_chars = 0
+    total_chars = len(text)
+    
+    # Check for duplicate sentences
+    seen_sentences = {}
+    for i, sent in enumerate(sentences):
+        # Normalize sentence for comparison
+        normalized = " ".join(sent.lower().split())
+        if len(normalized) < 40:
+            continue
+            
+        if normalized in seen_sentences:
+            duplicates.append({
+                "text": sent[:100] + "..." if len(sent) > 100 else sent,
+                "type": "exact_duplicate",
+                "first_occurrence": seen_sentences[normalized],
+                "second_occurrence": i + 1,
+                "severity": "high"
+            })
+            duplicate_chars += len(sent)
+        else:
+            seen_sentences[normalized] = i + 1
+    
+    # Check for similar sentences (near-duplicates)
+    sentence_shingles = []
+    for sent in sentences:
+        words = _tokenize_text(sent)
+        shingles = _create_shingles(words, 3)  # Use 3-grams for sentences
+        sentence_shingles.append((sent, shingles))
+    
+    for i in range(len(sentence_shingles)):
+        for j in range(i + 2, len(sentence_shingles)):  # Skip adjacent sentences
+            sent1, shingles1 = sentence_shingles[i]
+            sent2, shingles2 = sentence_shingles[j]
+            
+            similarity = _jaccard_similarity(shingles1, shingles2)
+            if similarity > 0.6 and similarity < 1.0:  # Similar but not exact
+                # Avoid duplicate entries
+                already_found = any(
+                    d["first_occurrence"] == i + 1 and d["second_occurrence"] == j + 1 
+                    for d in duplicates
+                )
+                if not already_found:
+                    duplicates.append({
+                        "text": sent1[:80] + "..." if len(sent1) > 80 else sent1,
+                        "similar_to": sent2[:80] + "..." if len(sent2) > 80 else sent2,
+                        "type": "near_duplicate",
+                        "similarity": round(similarity * 100, 1),
+                        "first_occurrence": i + 1,
+                        "second_occurrence": j + 1,
+                        "severity": "medium" if similarity < 0.8 else "high"
+                    })
+                    duplicate_chars += len(sent1) * (similarity - 0.5)
+    
+    duplicate_percentage = (duplicate_chars / total_chars * 100) if total_chars > 0 else 0
+    
+    return {
+        "duplicates": duplicates[:10],  # Limit to top 10
+        "duplicate_count": len(duplicates),
+        "duplicate_percentage": round(min(duplicate_percentage, 100), 1)
+    }
+
+
+def _analyze_vocabulary_richness(text: str) -> dict:
+    """Analyze vocabulary diversity and richness metrics."""
+    words = _tokenize_text(text)
+    
+    if not words:
+        return {
+            "total_words": 0,
+            "unique_words": 0,
+            "vocabulary_richness": 0,
+            "hapax_legomena": 0,
+            "avg_word_length": 0,
+            "assessment": "insufficient_text"
+        }
+    
+    total_words = len(words)
+    unique_words = len(set(words))
+    
+    # Type-Token Ratio (TTR)
+    ttr = unique_words / total_words if total_words > 0 else 0
+    
+    # Hapax legomena (words appearing only once)
+    from collections import Counter
+    word_freq = Counter(words)
+    hapax = sum(1 for w, c in word_freq.items() if c == 1)
+    hapax_ratio = hapax / total_words if total_words > 0 else 0
+    
+    # Average word length
+    avg_word_length = sum(len(w) for w in words) / total_words if total_words > 0 else 0
+    
+    # Yule's K measure (vocabulary richness that's more stable across text lengths)
+    if total_words > 0:
+        freq_of_freqs = Counter(word_freq.values())
+        m1 = total_words
+        m2 = sum(f * (c ** 2) for c, f in freq_of_freqs.items())
+        yules_k = 10000 * (m2 - m1) / (m1 * m1) if m1 > 0 else 0
+    else:
+        yules_k = 0
+    
+    # Assessment based on metrics
+    if ttr > 0.7:
+        assessment = "excellent"
+    elif ttr > 0.5:
+        assessment = "good"
+    elif ttr > 0.35:
+        assessment = "moderate"
+    else:
+        assessment = "low"
+    
+    return {
+        "total_words": total_words,
+        "unique_words": unique_words,
+        "vocabulary_richness": round(ttr * 100, 1),
+        "hapax_legomena": hapax,
+        "hapax_ratio": round(hapax_ratio * 100, 1),
+        "avg_word_length": round(avg_word_length, 1),
+        "yules_k": round(yules_k, 2),
+        "assessment": assessment
+    }
+
+
+def _detect_common_phrases(text: str) -> dict:
+    """Detect overly common academic phrases that might indicate template use or plagiarism."""
+    
+    # Common academic boilerplate phrases (often copied)
+    common_phrases = [
+        "it is important to note that",
+        "in this paper we",
+        "the results show that",
+        "as shown in figure",
+        "as shown in table",
+        "in conclusion",
+        "in summary",
+        "the purpose of this study",
+        "the aim of this research",
+        "literature review",
+        "the findings suggest",
+        "further research is needed",
+        "according to the results",
+        "based on the findings",
+        "it can be concluded that",
+        "the data indicates",
+        "significant difference",
+        "statistically significant",
+        "the study reveals",
+        "previous studies have shown",
+        "research has demonstrated",
+        "as mentioned earlier",
+        "as discussed above",
+        "it is evident that",
+        "it is clear that",
+        "in other words",
+        "on the other hand",
+        "in addition to",
+        "furthermore",
+        "moreover",
+        "nevertheless",
+        "however it should be noted",
+        "it is worth mentioning",
+        "this suggests that",
+        "this indicates that",
+    ]
+    
+    text_lower = text.lower()
+    found_phrases = []
+    
+    for phrase in common_phrases:
+        count = text_lower.count(phrase)
+        if count > 0:
+            found_phrases.append({
+                "phrase": phrase,
+                "count": count,
+                "risk": "low" if count == 1 else ("medium" if count <= 3 else "high")
+            })
+    
+    # Sort by count descending
+    found_phrases.sort(key=lambda x: x["count"], reverse=True)
+    
+    # Calculate boilerplate score
+    total_phrase_occurrences = sum(p["count"] for p in found_phrases)
+    word_count = len(text.split())
+    boilerplate_density = (total_phrase_occurrences * 5 / word_count * 100) if word_count > 0 else 0
+    
+    return {
+        "common_phrases": found_phrases[:15],
+        "total_occurrences": total_phrase_occurrences,
+        "boilerplate_density": round(min(boilerplate_density, 100), 1),
+        "risk_level": "low" if boilerplate_density < 5 else ("medium" if boilerplate_density < 15 else "high")
+    }
+
+
+def _analyze_style_consistency(text: str) -> dict:
+    """Analyze writing style consistency across the document."""
+    import re
+    
+    # Split into paragraphs
+    paragraphs = [p.strip() for p in text.split('\n\n') if len(p.strip()) > 50]
+    
+    if len(paragraphs) < 3:
+        return {
+            "consistency_score": 100,
+            "variations": [],
+            "assessment": "insufficient_paragraphs"
+        }
+    
+    paragraph_metrics = []
+    
+    for para in paragraphs:
+        sentences = re.split(r'[.!?]+', para)
+        sentences = [s.strip() for s in sentences if len(s.strip()) > 10]
+        
+        if not sentences:
+            continue
+        
+        # Calculate metrics for each paragraph
+        words = _tokenize_text(para)
+        
+        # Average sentence length
+        avg_sent_len = sum(len(s.split()) for s in sentences) / len(sentences) if sentences else 0
+        
+        # Vocabulary richness for this paragraph
+        unique_ratio = len(set(words)) / len(words) if words else 0
+        
+        # Complexity: ratio of long words (>6 chars)
+        long_words = sum(1 for w in words if len(w) > 6)
+        complexity = long_words / len(words) if words else 0
+        
+        paragraph_metrics.append({
+            "avg_sentence_length": avg_sent_len,
+            "vocabulary_richness": unique_ratio,
+            "complexity": complexity,
+            "word_count": len(words)
+        })
+    
+    if len(paragraph_metrics) < 2:
+        return {
+            "consistency_score": 100,
+            "variations": [],
+            "assessment": "insufficient_data"
+        }
+    
+    # Calculate standard deviations to detect inconsistencies
+    import statistics
+    
+    avg_sent_lengths = [p["avg_sentence_length"] for p in paragraph_metrics]
+    vocab_richnesses = [p["vocabulary_richness"] for p in paragraph_metrics]
+    complexities = [p["complexity"] for p in paragraph_metrics]
+    
+    variations = []
+    
+    # Check for significant variations in sentence length
+    if len(avg_sent_lengths) > 1:
+        sent_std = statistics.stdev(avg_sent_lengths)
+        sent_mean = statistics.mean(avg_sent_lengths)
+        sent_cv = (sent_std / sent_mean * 100) if sent_mean > 0 else 0
+        
+        if sent_cv > 50:
+            variations.append({
+                "metric": "sentence_length",
+                "description": f"Sentence length varies significantly (CV: {sent_cv:.1f}%)",
+                "severity": "high" if sent_cv > 75 else "medium",
+                "coefficient_of_variation": round(sent_cv, 1)
+            })
+    
+    # Check for vocabulary richness variations
+    if len(vocab_richnesses) > 1:
+        vocab_std = statistics.stdev(vocab_richnesses)
+        vocab_mean = statistics.mean(vocab_richnesses)
+        vocab_cv = (vocab_std / vocab_mean * 100) if vocab_mean > 0 else 0
+        
+        if vocab_cv > 40:
+            variations.append({
+                "metric": "vocabulary_richness",
+                "description": f"Vocabulary diversity varies between sections (CV: {vocab_cv:.1f}%)",
+                "severity": "high" if vocab_cv > 60 else "medium",
+                "coefficient_of_variation": round(vocab_cv, 1)
+            })
+    
+    # Check for complexity variations
+    if len(complexities) > 1:
+        comp_std = statistics.stdev(complexities)
+        comp_mean = statistics.mean(complexities)
+        comp_cv = (comp_std / comp_mean * 100) if comp_mean > 0 else 0
+        
+        if comp_cv > 45:
+            variations.append({
+                "metric": "writing_complexity",
+                "description": f"Writing complexity varies across sections (CV: {comp_cv:.1f}%)",
+                "severity": "high" if comp_cv > 70 else "medium",
+                "coefficient_of_variation": round(comp_cv, 1)
+            })
+    
+    # Calculate consistency score
+    total_cv = sum(v.get("coefficient_of_variation", 0) for v in variations)
+    consistency_score = max(0, 100 - total_cv * 0.5)
+    
+    return {
+        "consistency_score": round(consistency_score, 1),
+        "variations": variations,
+        "paragraph_count": len(paragraph_metrics),
+        "assessment": "consistent" if consistency_score > 80 else ("moderate" if consistency_score > 60 else "inconsistent")
+    }
+
+
+def _analyze_citation_patterns(text: str) -> dict:
+    """Analyze citation patterns and detect potential uncited content."""
+    import re
+    
+    # Common citation patterns
+    patterns = {
+        "apa": r'\([A-Z][a-z]+(?:\s+(?:&|and)\s+[A-Z][a-z]+)*,?\s*\d{4}[a-z]?\)',  # (Smith, 2020) or (Smith & Jones, 2020)
+        "ieee": r'\[\d+\]',  # [1]
+        "numbered": r'\(\d+\)',  # (1)
+        "harvard": r'[A-Z][a-z]+\s+\(\d{4}\)',  # Smith (2020)
+        "footnote": r'\[\w+\d+\]',  # [ref1]
+    }
+    
+    citation_counts = {}
+    total_citations = 0
+    
+    for style, pattern in patterns.items():
+        matches = re.findall(pattern, text)
+        if matches:
+            citation_counts[style] = len(matches)
+            total_citations += len(matches)
+    
+    # Detect potential uncited quotes
+    quote_patterns = [
+        r'"[^"]{30,}"',  # Double quotes
+        r"'[^']{30,}'",  # Single quotes
+        r'„[^"]{30,}"',  # German-style quotes
+    ]
+    
+    uncited_quotes = []
+    for pattern in quote_patterns:
+        matches = re.findall(pattern, text)
+        for match in matches:
+            # Check if there's a citation nearby
+            match_pos = text.find(match)
+            context = text[max(0, match_pos-50):min(len(text), match_pos+len(match)+50)]
+            
+            has_citation = any(re.search(p, context) for p in patterns.values())
+            if not has_citation:
+                uncited_quotes.append({
+                    "quote": match[:80] + "..." if len(match) > 80 else match,
+                    "issue": "Quoted text without visible citation"
+                })
+    
+    # Detect statistics without citations
+    stat_pattern = r'\d+(?:\.\d+)?%|\d+(?:\.\d+)?\s*(?:million|billion|thousand)'
+    stats_found = re.findall(stat_pattern, text.lower())
+    
+    # Calculate citation density
+    word_count = len(text.split())
+    citation_density = (total_citations / (word_count / 100)) if word_count > 0 else 0
+    
+    # Determine primary citation style
+    primary_style = max(citation_counts.items(), key=lambda x: x[1])[0] if citation_counts else "none"
+    
+    # Check for mixed citation styles
+    styles_used = [s for s, c in citation_counts.items() if c > 0]
+    mixed_styles = len(styles_used) > 1
+    
+    return {
+        "total_citations": total_citations,
+        "citation_styles": citation_counts,
+        "primary_style": primary_style,
+        "mixed_styles": mixed_styles,
+        "citation_density": round(citation_density, 2),
+        "uncited_quotes": uncited_quotes[:5],
+        "statistics_count": len(stats_found),
+        "assessment": "good" if citation_density > 2 else ("moderate" if citation_density > 0.5 else "low")
+    }
+
+
+def _calculate_text_fingerprint(text: str) -> dict:
+    """Create a fingerprint of the text for comparison purposes."""
+    words = _tokenize_text(text)
+    
+    # Create shingles
+    shingles_5 = _create_shingles(words, 5)
+    shingles_3 = _create_shingles(words, 3)
+    
+    # Compute MinHash signatures
+    signature = _compute_minhash_signature(shingles_5, 50)
+    
+    # Create a simple hash of the entire text
+    import hashlib
+    text_hash = hashlib.sha256(text.encode()).hexdigest()
+    
+    return {
+        "shingle_count_5": len(shingles_5),
+        "shingle_count_3": len(shingles_3),
+        "minhash_signature": signature[:10],  # First 10 for display
+        "document_hash": text_hash[:16],
+        "word_count": len(words)
+    }
+
+
+def analyze_plagiarism(text: str, filename: str = "") -> dict:
+    """
+    Comprehensive plagiarism analysis using algorithmic methods.
+    
+    This function performs multiple analyses:
+    1. Internal duplicate detection (self-plagiarism)
+    2. Vocabulary richness analysis
+    3. Common phrase detection
+    4. Style consistency analysis
+    5. Citation pattern analysis
+    6. Text fingerprinting
+    
+    Returns a comprehensive plagiarism report with scores and details.
+    """
+    
+    if not text or len(text.strip()) < 100:
+        return {
+            "overall_score": 0,
+            "risk_level": "unknown",
+            "error": "Text too short for analysis",
+            "analyses": {}
+        }
+    
+    # Run all analyses
+    internal_duplicates = _detect_internal_duplicates(text)
+    vocabulary = _analyze_vocabulary_richness(text)
+    common_phrases = _detect_common_phrases(text)
+    style = _analyze_style_consistency(text)
+    citations = _analyze_citation_patterns(text)
+    fingerprint = _calculate_text_fingerprint(text)
+    
+    # Calculate component scores (higher = more original, lower = more suspicious)
+    
+    # Duplicate score: penalize based on duplicate percentage
+    duplicate_score = max(0, 100 - internal_duplicates["duplicate_percentage"] * 2)
+    
+    # Vocabulary score: based on richness
+    vocab_score = vocabulary["vocabulary_richness"]
+    
+    # Common phrase score: penalize heavy boilerplate usage
+    phrase_score = max(0, 100 - common_phrases["boilerplate_density"] * 2)
+    
+    # Style score: consistency is good
+    style_score = style["consistency_score"]
+    
+    # Citation score: proper citations boost originality confidence
+    citation_boost = min(20, citations["citation_density"] * 5)
+    citation_penalty = 10 if citations["mixed_styles"] else 0
+    citation_score = 70 + citation_boost - citation_penalty - len(citations["uncited_quotes"]) * 5
+    citation_score = max(0, min(100, citation_score))
+    
+    # Calculate weighted overall score
+    weights = {
+        "duplicates": 0.30,
+        "vocabulary": 0.20,
+        "phrases": 0.15,
+        "style": 0.20,
+        "citations": 0.15
+    }
+    
+    overall_score = (
+        duplicate_score * weights["duplicates"] +
+        vocab_score * weights["vocabulary"] +
+        phrase_score * weights["phrases"] +
+        style_score * weights["style"] +
+        citation_score * weights["citations"]
+    )
+    
+    # Determine risk level
+    if overall_score >= 85:
+        risk_level = "low"
+        risk_description = "Document appears to be largely original"
+    elif overall_score >= 70:
+        risk_level = "moderate"
+        risk_description = "Some areas may need review"
+    elif overall_score >= 50:
+        risk_level = "elevated"
+        risk_description = "Multiple indicators suggest potential issues"
+    else:
+        risk_level = "high"
+        risk_description = "Significant concerns detected"
+    
+    # Generate summary issues
+    issues = []
+    
+    if internal_duplicates["duplicate_percentage"] > 5:
+        issues.append({
+            "type": "internal_duplicates",
+            "severity": "high" if internal_duplicates["duplicate_percentage"] > 15 else "medium",
+            "message": f"{internal_duplicates['duplicate_percentage']}% of content appears to be repeated internally"
+        })
+    
+    if vocabulary["assessment"] == "low":
+        issues.append({
+            "type": "vocabulary",
+            "severity": "medium",
+            "message": "Low vocabulary diversity may indicate copied content"
+        })
+    
+    if common_phrases["risk_level"] == "high":
+        issues.append({
+            "type": "boilerplate",
+            "severity": "medium",
+            "message": "High usage of common academic phrases detected"
+        })
+    
+    if style["assessment"] == "inconsistent":
+        issues.append({
+            "type": "style_variation",
+            "severity": "high",
+            "message": "Writing style varies significantly across sections"
+        })
+    
+    if citations["uncited_quotes"]:
+        issues.append({
+            "type": "uncited_content",
+            "severity": "medium",
+            "message": f"{len(citations['uncited_quotes'])} quoted passages without visible citations"
+        })
+    
+    if citations["mixed_styles"]:
+        issues.append({
+            "type": "citation_style",
+            "severity": "low",
+            "message": "Multiple citation styles detected"
+        })
+    
+    return {
+        "overall_score": round(overall_score, 1),
+        "originality_score": round(overall_score, 1),  # Alias for clarity
+        "risk_level": risk_level,
+        "risk_description": risk_description,
+        "issues": issues,
+        "component_scores": {
+            "duplicate_check": round(duplicate_score, 1),
+            "vocabulary_richness": round(vocab_score, 1),
+            "phrase_originality": round(phrase_score, 1),
+            "style_consistency": round(style_score, 1),
+            "citation_quality": round(citation_score, 1)
+        },
+        "analyses": {
+            "internal_duplicates": internal_duplicates,
+            "vocabulary": vocabulary,
+            "common_phrases": common_phrases,
+            "style_consistency": style,
+            "citations": citations,
+            "fingerprint": fingerprint
+        },
+        "word_count": len(text.split()),
+        "filename": filename
+    }
+
+
+def enhance_plagiarism_with_llm(text: str, basic_analysis: dict) -> dict:
+    """
+    Use LLM to enhance plagiarism analysis with contextual understanding.
+    This is optional and supplements the algorithmic analysis.
+    """
+    api_key = _get_api_key()
+    
+    if not api_key:
+        return basic_analysis
+    
+    # Only use LLM if there are concerning signals
+    if basic_analysis.get("overall_score", 100) > 80:
+        basic_analysis["llm_enhanced"] = False
+        return basic_analysis
+    
+    try:
+        client = OpenAI(api_key=api_key)
+        
+        # Prepare a summary of concerns for LLM
+        concerns = [issue["message"] for issue in basic_analysis.get("issues", [])]
+        
+        system_msg = """You are an academic integrity expert. Analyze the provided text excerpt and algorithmic analysis results. 
+Provide a brief assessment (2-3 sentences) of the originality concerns and specific recommendations.
+Respond in JSON with keys: assessment (string), recommendations (array of 3 strings), confidence (float 0-1)."""
+        
+        user_msg = f"""Document excerpt (first 2000 chars):
+{text[:2000]}
+
+Algorithmic Analysis Results:
+- Overall Score: {basic_analysis.get('overall_score', 'N/A')}/100
+- Risk Level: {basic_analysis.get('risk_level', 'unknown')}
+- Detected Issues: {', '.join(concerns) if concerns else 'None significant'}
+- Vocabulary Richness: {basic_analysis.get('component_scores', {}).get('vocabulary_richness', 'N/A')}%
+- Style Consistency: {basic_analysis.get('component_scores', {}).get('style_consistency', 'N/A')}%
+
+Provide your assessment and recommendations."""
+        
+        response = client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": system_msg},
+                {"role": "user", "content": user_msg}
+            ],
+            temperature=0.3,
+            max_tokens=400,
+        )
+        
+        raw = response.choices[0].message.content.strip()
+        
+        # Parse JSON response
+        import json
+        if "```json" in raw:
+            raw = raw.split("```json")[1].split("```")[0].strip()
+        elif "```" in raw:
+            raw = raw.split("```")[1].split("```")[0].strip()
+        
+        llm_result = json.loads(raw)
+        
+        basic_analysis["llm_enhanced"] = True
+        basic_analysis["llm_assessment"] = llm_result.get("assessment", "")
+        basic_analysis["llm_recommendations"] = llm_result.get("recommendations", [])
+        basic_analysis["llm_confidence"] = llm_result.get("confidence", 0.5)
+        
+    except Exception as exc:
+        _debug("plagiarism_llm.error", str(exc))
+        basic_analysis["llm_enhanced"] = False
+    
+    return basic_analysis
 
 
 def extract_text_from_pdf(pdf_path: str) -> str:
