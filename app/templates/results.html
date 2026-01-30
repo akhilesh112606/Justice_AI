@@ -3075,7 +3075,7 @@
               <button class="btn btn-secondary btn-icon" onclick="copyText()" title="Copy to clipboard">
                 <svg viewBox="0 0 24 24" style="width: 16px; height: 16px;"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>
               </button>
-              <button class="btn btn-secondary btn-icon" onclick="downloadText()" title="Download text">
+              <button class="btn btn-secondary btn-icon" onclick="downloadText()" title="Download report">
                 <svg viewBox="0 0 24 24" style="width: 16px; height: 16px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
               </button>
             </div>
@@ -4297,7 +4297,7 @@
         </a>
         <button class="btn btn-primary" onclick="downloadText()">
           <svg viewBox="0 0 24 24" style="width: 18px; height: 18px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-          Download Text
+          Download Report
         </button>
       </div>
     </div>
@@ -4352,10 +4352,15 @@
     // PDF.js initialization
     pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
-    // Store extracted text for download
+    // Store extracted text and analysis blobs for download
     const extractedText = {{ extracted_text | tojson }};
     const isPdf = {{ is_pdf | tojson if is_pdf is defined else 'false' }};
     const pdfBase64 = {{ pdf_base64 | tojson if pdf_base64 else 'null' }};
+    const plagiarismData = {{ plagiarism_data | tojson if plagiarism_data is defined else 'null' }};
+    const citationData = {{ citation_data | tojson if citation_data is defined else 'null' }};
+    const formattingData = {{ formatting_data | tojson if formatting_data is defined else 'null' }};
+    const rewriteData = {{ rewrite_data | tojson if rewrite_data is defined else 'null' }};
+    const reportFilename = {{ filename | tojson if filename is defined else '"analysis"' }};
 
     // PDF Viewer State
     let pdfDoc = null;
@@ -4482,16 +4487,31 @@
     }
 
     function downloadText() {
-      const filename = '{{ filename }}'.replace(/\.[^/.]+$/, '') + '_extracted.txt';
-      const blob = new Blob([extractedText], { type: 'text/plain' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      // Submit extracted text and analysis blobs to server-side PDF generator (/report/pdf)
+      try { showNotification('Preparing PDF report...'); } catch (e) { /* ignore */ }
+      const form = document.createElement('form');
+      form.method = 'POST';
+      form.action = '/report/pdf';
+
+      function addField(name, value) {
+        const inp = document.createElement('input');
+        inp.type = 'hidden';
+        inp.name = name;
+        inp.value = value;
+        form.appendChild(inp);
+      }
+
+      const textVal = extractedText || document.getElementById('extracted-text')?.innerText || '';
+      addField('report_text', textVal);
+      addField('filename', reportFilename || 'analysis');
+
+      try { if (plagiarismData) addField('plagiarism_json', JSON.stringify(plagiarismData)); } catch (e) {}
+      try { if (citationData) addField('citation_json', JSON.stringify(citationData)); } catch (e) {}
+      try { if (formattingData) addField('formatting_json', JSON.stringify(formattingData)); } catch (e) {}
+      try { if (rewriteData) addField('rewrite_json', JSON.stringify(rewriteData)); } catch (e) {}
+
+      document.body.appendChild(form);
+      form.submit();
     }
 
     function showNotification(message) {

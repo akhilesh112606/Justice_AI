@@ -1035,6 +1035,145 @@ def _generate_pdf_report(
     buffer.seek(0)
     return buffer.read()
 
+
+def _generate_full_report(
+    cleaned_text: str,
+    filename: str = "",
+    plagiarism: dict | None = None,
+    citation: dict | None = None,
+    formatting: dict | None = None,
+    rewrite: dict | None = None,
+    extra_notes: str = "",
+) -> bytes:
+    """Generate a comprehensive PDF containing all analysis sections.
+
+    This function is used by the results page 'Download Report' flow which POSTs
+    analysis JSON (plagiarism, citation, formatting, rewrite) along with the
+    extracted text. It returns PDF bytes ready for a download response.
+    """
+    buffer = io.BytesIO()
+    pdf = canvas.Canvas(buffer, pagesize=A4)
+    width, height = A4
+
+    margin_x = 18 * mm
+    margin_top = height - 22 * mm
+    margin_bottom = 18 * mm
+
+    text_obj = pdf.beginText()
+    text_obj.setTextOrigin(margin_x, margin_top)
+    text_obj.setFont("Helvetica-Bold", 18)
+    title = "ReviewerAI - Analysis Report"
+    text_obj.textLine(title)
+    text_obj.setFont("Helvetica", 9)
+    text_obj.textLine("")
+    text_obj.textLine(f"File: {filename or 'N/A'}")
+    text_obj.textLine(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    text_obj.textLine("")
+
+    def add_section(title: str, body_lines: list[str]):
+        text_obj.setFont("Helvetica-Bold", 12)
+        text_obj.textLine(title)
+        text_obj.setFont("Helvetica", 9)
+        text_obj.textLine("")
+        for line in body_lines:
+            wrapped = simpleSplit(line, "Helvetica", 9, width - 2 * margin_x)
+            for w in wrapped:
+                text_obj.textLine(w)
+        text_obj.textLine("")
+
+    # Overview / Summary
+    overview_lines = []
+    if plagiarism and isinstance(plagiarism, dict):
+        score = plagiarism.get("overall_score")
+        risk = plagiarism.get("risk_level")
+        overview_lines.append(f"Plagiarism score: {score if score is not None else 'N/A'}")
+        overview_lines.append(f"Plagiarism risk: {risk or 'N/A'}")
+    if citation and isinstance(citation, dict):
+        cit_summary = citation.get("summary") or citation.get("overall") or ""
+        if cit_summary:
+            overview_lines.append(f"Citation summary: {cit_summary}")
+    if overview_lines:
+        add_section("Overview", overview_lines)
+
+    # Plagiarism details
+    if plagiarism and isinstance(plagiarism, dict):
+        p_lines = []
+        p_lines.append(f"Overall score: {plagiarism.get('overall_score', 'N/A')}")
+        p_lines.append(f"Risk level: {plagiarism.get('risk_level', 'N/A')}")
+        top_matches = plagiarism.get("top_matches") or []
+        if top_matches:
+            p_lines.append("")
+            p_lines.append("Top matches:")
+            for m in top_matches[:6]:
+                source = m.get("source") or m.get("url") or m.get("title") or "match"
+                score = m.get("score") or m.get("similarity") or ""
+                p_lines.append(f"- {source} ({score})")
+        add_section("Plagiarism Analysis", p_lines)
+
+    # Citation details
+    if citation and isinstance(citation, dict):
+        c_lines = []
+        c_lines.append(citation.get("summary", "Citation analysis not available."))
+        refs = citation.get("references") or citation.get("parsed_refs") or []
+        if refs:
+            c_lines.append("")
+            c_lines.append("References:")
+            for r in refs[:20]:
+                rtxt = r.get("text") if isinstance(r, dict) else str(r)
+                c_lines.append(f"- {rtxt}")
+        add_section("Citation Analysis", c_lines)
+
+    # Formatting suggestions
+    if formatting and isinstance(formatting, dict):
+        f_lines = []
+        summary = formatting.get("summary") or formatting.get("issues") or None
+        if isinstance(summary, list):
+            for item in summary:
+                f_lines.append(f"- {item}")
+        elif summary:
+            f_lines.append(str(summary))
+        else:
+            f_lines.append("No formatting suggestions detected.")
+        add_section("Formatting Suggestions", f_lines)
+
+    # Rewrite opportunities
+    if rewrite and isinstance(rewrite, dict):
+        r_lines = []
+        opps = rewrite.get("opportunities") or rewrite.get("sections") or []
+        if opps:
+            for sec in opps[:30]:
+                name = sec.get("name") or sec.get("section_name") or sec.get("title") or "Section"
+                snippet = sec.get("snippet") or sec.get("original_text") or ""
+                r_lines.append(f"{name}:")
+                if snippet:
+                    r_lines.append(f"{snippet[:400]}{('...' if len(snippet) > 400 else '')}")
+                rewritten = sec.get("rewritten_text") or sec.get("suggested_fix") or ""
+                if rewritten:
+                    r_lines.append("Rewritten suggestion:")
+                    r_lines.append(f"{rewritten[:500]}{('...' if len(rewritten) > 500 else '')}")
+                r_lines.append("")
+        else:
+            r_lines.append("No rewrite opportunities detected.")
+        add_section("Rewrite Opportunities", r_lines)
+
+    # Extra notes
+    if extra_notes:
+        add_section("Notes", [extra_notes])
+
+    # Extracted text (trim if very long)
+    snippet = (cleaned_text or "").strip()
+    if not snippet:
+        snippet = "[No text provided]"
+    if len(snippet) > 8000:
+        snippet = snippet[:8000] + "\n\n[Truncated]"
+    add_section("Extracted Text", snippet.splitlines() or [snippet])
+
+    pdf.drawText(text_obj)
+    pdf.showPage()
+    pdf.save()
+    buffer.seek(0)
+    return buffer.read()
+
 @main.route("/")
 def index():
     return render_template("landing.html")
@@ -1427,33 +1566,54 @@ def analyze_audio():
 @main.route("/report/pdf", methods=["POST"])
 def download_report_pdf():
     """Generate a PDF report for the current FIR context and return it as a download."""
+    # Accept expanded form inputs (sent from results.html) so the server can
+    # build a full PDF that mirrors the page: extracted text plus analysis
     raw_text = (request.form.get("report_text") or "").strip()
     if not raw_text:
-        flash("FIR text is empty. Please ensure there is content before generating a report.", "error")
-        # Always redirect to a GET-safe route to avoid 405 errors from POST-only pages.
+        flash("Text is empty. Please ensure there is content before generating a report.", "error")
         return redirect(url_for("main.index"))
 
-    cleaned = format_text(raw_text)
-    analysis_text = cleaned.strip() if cleaned else raw_text
-
-    characters, general_questions = build_questions(analysis_text)
-    character_profiles = extract_character_profiles(analysis_text)
-    roadmap_steps = build_roadmap(analysis_text, characters, general_questions)
-    locations = extract_locations(analysis_text)
+    # Optional JSON blobs supplied by the client (serialized server-side data)
+    plagiarism_json = request.form.get("plagiarism_json")
+    citation_json = request.form.get("citation_json")
+    formatting_json = request.form.get("formatting_json")
+    rewrite_json = request.form.get("rewrite_json")
+    filename = request.form.get("filename") or request.form.get("report_filename") or ""
+    extra_notes = request.form.get("notes") or ""
 
     try:
-        pdf_bytes = _generate_pdf_report(
-            analysis_text,
-            characters,
-            character_profiles,
-            general_questions,
-            roadmap_steps,
-            locations,
+        plagiarism = json.loads(plagiarism_json) if plagiarism_json else None
+    except Exception:
+        plagiarism = None
+    try:
+        citation = json.loads(citation_json) if citation_json else None
+    except Exception:
+        citation = None
+    try:
+        formatting = json.loads(formatting_json) if formatting_json else None
+    except Exception:
+        formatting = None
+    try:
+        rewrite = json.loads(rewrite_json) if rewrite_json else None
+    except Exception:
+        rewrite = None
+
+    cleaned = format_text(raw_text)
+    try:
+        pdf_bytes = _generate_full_report(
+            cleaned_text=cleaned or raw_text,
+            filename=filename,
+            plagiarism=plagiarism,
+            citation=citation,
+            formatting=formatting,
+            rewrite=rewrite,
+            extra_notes=extra_notes,
         )
         _debug("report.pdf_size_bytes", len(pdf_bytes))
+        out_name = (filename or "reviewerai_report").replace(' ', '_')
         headers = {
             "Content-Type": "application/pdf",
-            "Content-Disposition": "attachment; filename=firm_report.pdf",
+            "Content-Disposition": f"attachment; filename={secure_filename(out_name)}.pdf",
         }
         return Response(pdf_bytes, headers=headers)
     except Exception as exc:  # noqa: BLE001
