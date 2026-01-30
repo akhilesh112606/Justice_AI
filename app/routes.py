@@ -4176,12 +4176,158 @@ Respond ONLY in JSON:
         except Exception as exc:
             _debug("citation_llm.error", str(exc))
     
+    # ============ ADVANCED ANALYTICS ============
+    
+    # Citation Timeline (year distribution)
+    year_distribution = Counter()
+    for ref in references:
+        if ref.get("year"):
+            try:
+                year = int(ref["year"])
+                if 1950 <= year <= 2026:
+                    year_distribution[year] = year_distribution.get(year, 0) + 1
+            except ValueError:
+                pass
+    
+    # Create timeline data sorted by year
+    timeline_data = []
+    if year_distribution:
+        min_year = min(year_distribution.keys())
+        max_year = max(year_distribution.keys())
+        for year in range(min_year, max_year + 1):
+            timeline_data.append({
+                "year": year,
+                "count": year_distribution.get(year, 0),
+                "is_recent": year >= 2020
+            })
+    
+    # Source Type Classification
+    source_types = {"journal": 0, "conference": 0, "book": 0, "thesis": 0, "web": 0, "other": 0}
+    for ref in references:
+        raw_text = ref.get("raw_text", "").lower()
+        if any(kw in raw_text for kw in ["journal", "transactions", "letters", "review"]):
+            source_types["journal"] += 1
+        elif any(kw in raw_text for kw in ["conference", "proceedings", "symposium", "workshop", "ieee", "acm"]):
+            source_types["conference"] += 1
+        elif any(kw in raw_text for kw in ["book", "chapter", "edition", "publisher", "press"]):
+            source_types["book"] += 1
+        elif any(kw in raw_text for kw in ["thesis", "dissertation", "phd", "master"]):
+            source_types["thesis"] += 1
+        elif ref.get("url") and not ref.get("doi"):
+            source_types["web"] += 1
+        else:
+            source_types["other"] += 1
+    
+    # Author Diversity Analysis
+    all_authors = []
+    unique_first_authors = set()
+    for ref in references:
+        authors = ref.get("authors", "")
+        if authors:
+            # Extract first author's last name
+            first_author_match = re.match(r'^([A-Z][a-zA-Z\-]+)', authors)
+            if first_author_match:
+                unique_first_authors.add(first_author_match.group(1).lower())
+            # Count comma-separated authors
+            author_count = len(re.findall(r'[A-Z][a-zA-Z]+', authors[:100]))
+            all_authors.append(min(author_count, 10))
+    
+    author_diversity = {
+        "unique_first_authors": len(unique_first_authors),
+        "total_references": len(references),
+        "diversity_ratio": round(len(unique_first_authors) / max(len(references), 1) * 100, 1),
+        "avg_authors_per_ref": round(sum(all_authors) / max(len(all_authors), 1), 1) if all_authors else 0
+    }
+    
+    # Section-wise Citation Distribution (based on position in document)
+    section_distribution = {"introduction": 0, "methods": 0, "results": 0, "discussion": 0}
+    doc_length = len(text)
+    for cit in detected_citations:
+        position_ratio = cit["position"] / max(doc_length, 1)
+        if position_ratio < 0.2:
+            section_distribution["introduction"] += 1
+        elif position_ratio < 0.4:
+            section_distribution["methods"] += 1
+        elif position_ratio < 0.7:
+            section_distribution["results"] += 1
+        else:
+            section_distribution["discussion"] += 1
+    
+    # Citation Clustering - find citation "bursts" (multiple citations close together)
+    citation_clusters = []
+    if len(detected_citations) > 1:
+        cluster_start = 0
+        current_cluster = [detected_citations[0]]
+        
+        for i in range(1, len(detected_citations)):
+            curr_pos = detected_citations[i]["position"]
+            prev_pos = detected_citations[i-1]["position"]
+            
+            if curr_pos - prev_pos < 200:  # Within 200 chars = same cluster
+                current_cluster.append(detected_citations[i])
+            else:
+                if len(current_cluster) >= 2:
+                    citation_clusters.append({
+                        "size": len(current_cluster),
+                        "position": current_cluster[0]["position"],
+                        "page": current_cluster[0]["page"],
+                        "citations": [c["text"] for c in current_cluster[:5]]
+                    })
+                current_cluster = [detected_citations[i]]
+        
+        # Don't forget last cluster
+        if len(current_cluster) >= 2:
+            citation_clusters.append({
+                "size": len(current_cluster),
+                "position": current_cluster[0]["position"],
+                "page": current_cluster[0]["page"],
+                "citations": [c["text"] for c in current_cluster[:5]]
+            })
+    
+    # Reference Quality Score Breakdown
+    quality_metrics = {
+        "recency_score": min(100, (reference_quality.get("recent_refs_count", 0) / max(len(references), 1)) * 200),
+        "verification_score": (len(verified_refs) / max(len(references[:20]), 1)) * 100 if references else 0,
+        "completeness_score": sum(1 for r in references if r.get("title") and r.get("year") and r.get("authors")) / max(len(references), 1) * 100,
+        "diversity_score": author_diversity["diversity_ratio"],
+        "density_score": min(100, (citation_density.get("citations_per_1000_words", 0) / 20) * 100)
+    }
+    
+    # Citation Health Indicators
+    health_indicators = []
+    
+    if quality_metrics["recency_score"] >= 70:
+        health_indicators.append({"label": "Recent Sources", "status": "good", "value": f"{reference_quality.get('recent_refs_count', 0)} refs from 2020+"})
+    elif quality_metrics["recency_score"] >= 40:
+        health_indicators.append({"label": "Recent Sources", "status": "warning", "value": "Some recent, needs more"})
+    else:
+        health_indicators.append({"label": "Recent Sources", "status": "poor", "value": "Mostly outdated sources"})
+    
+    if quality_metrics["verification_score"] >= 70:
+        health_indicators.append({"label": "Reference Quality", "status": "good", "value": f"{len(verified_refs)} verified"})
+    elif quality_metrics["verification_score"] >= 40:
+        health_indicators.append({"label": "Reference Quality", "status": "warning", "value": "Partially verifiable"})
+    else:
+        health_indicators.append({"label": "Reference Quality", "status": "poor", "value": "Many unverifiable"})
+    
+    if len(citation_styles_found) == 1:
+        health_indicators.append({"label": "Style Consistency", "status": "good", "value": list(citation_styles_found)[0].replace("_", " ").title()})
+    else:
+        health_indicators.append({"label": "Style Consistency", "status": "warning", "value": f"{len(citation_styles_found)} styles mixed"})
+    
+    if author_diversity["diversity_ratio"] >= 80:
+        health_indicators.append({"label": "Author Diversity", "status": "good", "value": f"{author_diversity['unique_first_authors']} unique authors"})
+    elif author_diversity["diversity_ratio"] >= 50:
+        health_indicators.append({"label": "Author Diversity", "status": "warning", "value": "Moderate diversity"})
+    else:
+        health_indicators.append({"label": "Author Diversity", "status": "poor", "value": "Low diversity - expand sources"})
+    
     return {
         "citation_score": score,
         "risk_level": risk_level,
         "total_citations": len(detected_citations),
         "total_references": len(references),
-        "citations": detected_citations[:50],  # Limit for response size
+        "citations": detected_citations[:50],
         "references": references[:30],
         "verified_count": len(verified_refs),
         "unverified_count": len(unverified_refs),
@@ -4191,7 +4337,15 @@ Respond ONLY in JSON:
         "issues": issues,
         "unsupported_claims": unsupported_claims[:10],
         "reference_quality": reference_quality,
-        "llm_analysis": llm_analysis
+        "llm_analysis": llm_analysis,
+        # Advanced Analytics
+        "timeline_data": timeline_data,
+        "source_types": source_types,
+        "author_diversity": author_diversity,
+        "section_distribution": section_distribution,
+        "citation_clusters": citation_clusters[:10],
+        "quality_metrics": quality_metrics,
+        "health_indicators": health_indicators
     }
 
 
@@ -4527,7 +4681,8 @@ Please provide a rewritten version that addresses the feedback while maintaining
         import json
         result = json.loads(raw)
         
-        return {
+        # Normalize response keys to match frontend expectations while keeping legacy keys
+        resp = {
             "success": True,
             "original": section_text,
             "rewrite": result.get("rewritten_text", ""),
@@ -4536,14 +4691,22 @@ Please provide a rewritten version that addresses the feedback while maintaining
             "confidence": result.get("confidence", 0.7),
             "section": section_name
         }
+        # Frontend expects these keys: original_text, rewritten_text, changes
+        resp["original_text"] = resp.get("original")
+        resp["rewritten_text"] = resp.get("rewrite")
+        resp["changes"] = resp.get("changes_made")
+        return resp
         
     except Exception as exc:
         _debug("section_rewrite.error", str(exc))
+        # Return normalized failure payload
         return {
             "success": False,
             "error": str(exc),
             "original": section_text,
-            "rewrite": None
+            "original_text": section_text,
+            "rewrite": None,
+            "rewritten_text": None
         }
 
 
